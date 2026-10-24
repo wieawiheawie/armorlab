@@ -1,0 +1,2 @@
+{ "name": "ArmorLab", "image": "mcr.microsoft.com/devcontainers/javascript-node:22-bookworm",
+  "postCreateCommand": "bash scripts/codespace_setup.sh", "customizations": { "vscode": { "extensions": ["rust-lang.rust-analyzer"] } } }

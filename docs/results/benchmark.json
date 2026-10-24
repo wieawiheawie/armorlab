@@ -1,0 +1,68 @@
+[
+ {
+  "target_n": 5000,
+  "n": 5078,
+  "bonds": 19607,
+  "build_s": 0.1,
+  "ms_per_step": 4.94,
+  "dt_ns": 197,
+  "wall_s_per_sim_us": 0.025,
+  "rss_MB": 56,
+  "status": "ok"
+ },
+ {
+  "target_n": 18000,
+  "n": 18232,
+  "bonds": 71585,
+  "build_s": 0.15,
+  "ms_per_step": 14.96,
+  "dt_ns": 104,
+  "wall_s_per_sim_us": 0.144,
+  "rss_MB": 79,
+  "status": "ok"
+ },
+ {
+  "target_n": 100000,
+  "n": 100502,
+  "bonds": 398852,
+  "build_s": 0.77,
+  "ms_per_step": 77.65,
+  "dt_ns": 44,
+  "wall_s_per_sim_us": 1.751,
+  "rss_MB": 137,
+  "status": "ok"
+ },
+ {
+  "target_n": 250000,
+  "n": 251104,
+  "bonds": 999428,
+  "build_s": 1.64,
+  "ms_per_step": 182.95,
+  "dt_ns": 28,
+  "wall_s_per_sim_us": 6.526,
+  "rss_MB": 304,
+  "status": "ok"
+ },
+ {
+  "target_n": 500000,
+  "n": 499944,
+  "bonds": 1992735,
+  "build_s": 2.18,
+  "ms_per_step": 382.2,
+  "dt_ns": 20,
+  "wall_s_per_sim_us": 19.247,
+  "rss_MB": 309,
+  "status": "ok"
+ },
+ {
+  "target_n": 1000000,
+  "n": 998956,
+  "bonds": 3985869,
+  "build_s": 4.07,
+  "ms_per_step": 743.6,
+  "dt_ns": 14,
+  "wall_s_per_sim_us": 52.918,
+  "rss_MB": 556,
+  "status": "ok"
+ }
+]

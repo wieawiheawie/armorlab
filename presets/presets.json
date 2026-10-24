@@ -1,0 +1,60 @@
+{
+  "schema": "armorlab-presets-1",
+  "angle_convention": "slope_from_vertical_deg: 0 = vertical plate, top leans away from shooter. face_angle_from_horizontal_deg = 90 - slope.",
+  "targets": {
+    "TIGER1_UPPER_FRONT": {
+      "name": "Tiger I upper front (driver/superstructure) plate",
+      "nominal_thickness_mm": 100.0, "slope_from_vertical_deg": 9.0, "face_angle_from_horizontal_deg": 81.0,
+      "coupon_face_length_mm": 400.0, "support": "clamped_ends (3 particle layers at both face ends)",
+      "pairing": "TIGER1_PZGR39", "material": "PLATE_PROVISIONAL", "research_id": "DE_TIGER1_HULL_FRONT_UPPER",
+      "source": "https://tanks-encyclopedia.com/ww2/germany/panzer-vi_tiger.php", "status": "historical geometry; coupon size is an ArmorLab choice"
+    },
+    "TIGER1_NOSE_ALT": {
+      "name": "Tiger I nose / lower front plate (alternate)",
+      "nominal_thickness_mm": 100.0, "slope_from_vertical_deg": 25.0, "face_angle_from_horizontal_deg": 65.0,
+      "coupon_face_length_mm": 400.0, "support": "clamped_ends (3 particle layers at both face ends)",
+      "pairing": "TIGER1_PZGR39", "material": "PLATE_PROVISIONAL", "research_id": "DE_TIGER1_HULL_NOSE_LOWER",
+      "source": "https://tanks-encyclopedia.com/ww2/germany/panzer-vi_tiger.php", "status": "historical geometry; coupon size is an ArmorLab choice"
+    },
+    "TIGER2_UPPER_GLACIS": {
+      "name": "Tiger II upper hull glacis",
+      "nominal_thickness_mm": 150.0, "slope_from_vertical_deg": 50.0, "face_angle_from_horizontal_deg": 40.0,
+      "coupon_face_length_mm": 500.0, "support": "clamped_ends (3 particle layers at both face ends)",
+      "pairing": "TIGER2_PZGR3943", "material": "PLATE_PROVISIONAL", "research_id": "DE_TIGER2_PRODUCTION_GLACIS",
+      "source": "https://tanks-encyclopedia.com/ww2/germany/panzer-vi_konigstiger.php", "status": "historical geometry; coupon size is an ArmorLab choice"
+    }
+  },
+  "ammunition": {
+    "TIGER1_PZGR39": {
+      "name": "8.8 cm Pzgr.39 (APCBC-HE-T)", "gun": "8.8 cm KwK 36 L/56 (Tiger I)",
+      "projectile_mass_kg": 10.2, "nominal_muzzle_velocity_mps": 773.0, "calibre_mm": 88.0, "listed_filler_g": 59.0,
+      "research_id": "DE_88_KWK36_PZGR39_1",
+      "length_mm": 250.0, "nose_length_mm": 90.0, "material": "PROJECTILE_PROVISIONAL",
+      "shape_fidelity": "APPROXIMATE silhouette (elliptical nose + cylinder), solid; no cap, cavity, fuze or filler. Length/nose are ArmorLab placeholders, NOT sourced.",
+      "solver_mode": "kinetic-only; fuze/explosive disabled",
+      "source": "https://wikitanks.com/index.php?title=8%2C8_cm_KwK_36_L%2F56"
+    },
+    "TIGER2_PZGR3943": {
+      "name": "8.8 cm Pzgr.39/43 (APCBC-HE)", "gun": "8.8 cm KwK 43 L/71 (Tiger II)",
+      "projectile_mass_kg": 10.16, "nominal_muzzle_velocity_mps": 1000.0, "calibre_mm": 88.0, "listed_filler_g": null,
+      "research_id": "DE_88_KWK43_PZGR39_43",
+      "length_mm": 250.0, "nose_length_mm": 90.0, "material": "PROJECTILE_PROVISIONAL",
+      "shape_fidelity": "APPROXIMATE silhouette (elliptical nose + cylinder), solid; no cap, cavity, fuze or filler. Length/nose are ArmorLab placeholders, NOT sourced.",
+      "solver_mode": "kinetic-only; fuze/explosive disabled",
+      "source": "https://tanks-encyclopedia.com/ww2/germany/panzer-vi_konigstiger.php"
+    }
+  },
+  "materials": {
+    "PLATE_PROVISIONAL": {
+      "status": "provisional", "class": "WWII German rolled armour steel (exact grade/lot/heat-treatment UNKNOWN)",
+      "density_kg_m3": 7850.0, "youngs_modulus_Pa": 200e9, "yield_stress_Pa": 1000e6, "hardening_ratio_H_over_E": 0.02, "critical_tensile_bond_strain": 0.08,
+      "provenance": { "density": "generic steel (not plate-specific)", "youngs_modulus": "generic steel (not plate-specific)", "yield_stress": "TUNING ESTIMATE, not sourced", "hardening": "TUNING", "critical_strain": "TUNING" }
+    },
+    "PROJECTILE_PROVISIONAL": {
+      "status": "provisional", "class": "hardened projectile steel (exact grade UNKNOWN)",
+      "density_kg_m3": 7850.0, "youngs_modulus_Pa": 200e9, "yield_stress_Pa": 2000e6, "hardening_ratio_H_over_E": 0.02, "critical_tensile_bond_strain": 0.04,
+      "provenance": { "density": "generic steel", "youngs_modulus": "generic steel", "yield_stress": "TUNING ESTIMATE, not sourced", "hardening": "TUNING", "critical_strain": "TUNING" }
+    }
+  },
+  "solver": { "contact_stiffness_factor": 1.0, "dt_factor": 0.25, "crush_failure_strain": -0.5, "end_time_s": 0.0006 }
+}

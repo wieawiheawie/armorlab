@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ArmorLab</title>
+<style>/*__CSS__*/</style></head>
+<body><div id="app">
+<header><b>ARMOR<i>LAB</i></b><span class="sc" id="scenario"></span><span class="st"><span id="backend"></span><span class="pill" id="state">idle</span></span></header>
+<main>
+<aside class="l">
+<h4>Target</h4>
+<select id="target"></select><div class="note" id="geo"></div>
+<h4>Ammunition</h4>
+<label><input type="checkbox" id="cmp"> Comparison mode (any round on any plate)</label>
+<select id="ammo"></select><div class="note" id="ammoInfo"></div>
+<label>Impact speed (m/s) <span class="note">idealised: muzzle speed used as impact speed; no flight/drag</span></label>
+<input type="number" id="vel" min="50" max="1500" step="1">
+<h4>Run</h4>
+<div class="row"><button class="p" id="fire">Fire</button><button id="pause" disabled>Pause</button><button id="reset">Reset</button></div>
+<label>Playback (simulated µs per wall second)</label>
+<select id="speed"><option value="2">2</option><option value="5">5</option><option value="10" selected>10</option><option value="25">25</option><option value="60">60</option><option value="0">max</option></select>
+<label>Resolution tier (target particle count)</label>
+<select id="quality"><option value="3000">Draft ~3k (weak hardware)</option><option value="18000" selected>Standard ~18k</option><option value="100000">High ~100k (slow, minutes)</option><option value="250000">Extreme ~250k (long run, unbenchmarked in browser)</option><option value="1000000">Experimental ~1M (hours; unbenchmarked in browser)</option></select>
+<div class="row"><button id="calib">Calibrate speed</button></div><div class="note" id="tierNote">Press Calibrate to measure this device and estimate run time per tier.</div>
+<label>Support</label>
+<select id="support"><option value="0">clamped ends</option><option value="1">free (no constraint)</option></select>
+<label>View</label>
+<select id="view"><option value="0">Normal (material, damage-darkened)</option><option value="1">Material ID</option><option value="2">Damage (broken-bond fraction)</option><option value="3">Velocity magnitude</option></select>
+<div class="row"><button id="fit">Fit view</button></div>
+<div class="note">Wheel: zoom. Drag: pan. Click: inspect a particle. Stress/temperature views are not offered: not computed.</div>
+</aside>
+<div id="vp"><canvas id="grid"></canvas><canvas id="gl"></canvas><div id="legend"></div><div id="err"></div></div>
+<aside class="r">
+<h4>Outcome (from solver state)</h4><div class="out" id="outcome">-</div>
+<h4>Telemetry</h4>
+<table class="tbl" id="tele"></table>
+<h4 id="energyH">Energy ledger (J)</h4>
+<table class="tbl" id="energy"></table>
+<details><summary>Historical penetration references (not solver rules)</summary><div id="reference" class="note"></div></details>
+<h4>Inspector</h4><div id="insp" class="note">Click a particle.</div>
+<h4>Status / warnings</h4><div id="warn" class="note"></div>
+</aside>
+</main></div>
+<script>window.ARMORLAB_PRESETS=/*__PRESETS__*/;window.ARMORLAB_RESEARCH_CSV=/*__RESEARCH_CSV__*/;window.ARMORLAB_WASM_B64=/*__WASM__*/;window.ARMORLAB_BUILD="/*__BUILD__*/";</script>
+<script type="text/plain" id="al-worker-src">/*__WORKER_SRC__*/</script>
+<script>/*__ENGINE_JS__*/</script>
+<script>/*__ENGINE_WASM__*/</script>
+<script>/*__RESEARCH__*/</script>
+<script>/*__SCENARIO__*/</script>
+<script>/*__RUNNER__*/</script>
+<script>/*__PICK__*/</script>
+<script>/*__HOST__*/</script>
+<script>/*__RENDER__*/</script>
+<script>/*__APP__*/</script>
+</body></html>

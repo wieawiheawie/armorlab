@@ -1,0 +1,175 @@
+ARMORLAB — CLEAN PARTICLE-SIMULATION REBUILD BRIEF
+Version: 1.0
+Prepared: 2026-10-24
+
+PURPOSE
+Build a fresh, compact ArmorLab source project that imitates the *approach* publicly documented for Armor Sandbox: a 2D material-driven impact world in which each visible particle represents actual simulation state. The end product must be editable source that compiles to a single offline HTML file using Rust/WebAssembly. This is a reference-driven brief, not a claim that Armor Sandbox's private solver has been reverse-engineered.
+
+USE THESE FILES
+1. ArmorLab_Particle_Tiger_Reference.csv — machine-readable requirements, source records, target geometry, round presets, particle renderer requirements and acceptance tests.
+2. ArmorLab_Tiger_Armor_Geometry_Chart.csv / .png — nominal plate thickness vs geometric horizontal line-of-sight (LOS) path. LOS is geometry only, not a penetration rating.
+3. This text file — implementation instructions for Claude.
+
+IMPORTANT ACCURACY LIMIT
+The public sources can establish nominal geometry and common ammunition designations/launch data. They do not provide a complete, batch-specific, calibrated constitutive model for every original Tiger I/Tiger II plate. Do not claim a true 1:1 ballistic simulation until the exact plate's chemistry, heat treatment, strength vs strain rate, toughness/fracture data and matching test data are sourced. Build a traceable historical reconstruction with unknowns flagged, not invented.
+
+PART 1 — RESTART SAFELY
+- Back up the current project before replacing any source.
+- Create a clean, minimal project root; keep the research CSV/TXT and generated output visible in a predictable place.
+- Reuse previous code only after auditing it and running tests. Do not drag forward an unverified solver merely to avoid rewriting it.
+- Use Rust for the physics engine, compile to wasm32-unknown-unknown, and keep UI/render code separate from the physics.
+- First target is desktop browser, offline, direct file:// open. Do not require a local web server or network runtime.
+
+PART 2 — PARTICLE REPRESENTATION LIKE ARMOR SANDBOX
+Armor Sandbox publicly describes its world as a 2D cross-section made of particles with material properties and advertises up to one million particles. Its exact solver method is not publicly established. Copy the general representation concept, not an unsupported claim about its equations.
+
+Requirements:
+- Each circle/dot in the viewport corresponds to an actual numerical material element with a persistent identity/material ID and solver state. Do not spawn decorative particles from an animation.
+- Particle state should include positions, velocities, mass and material identity, plus whatever stress/strain, plasticity, damage, temperature or connectivity state the selected model genuinely requires.
+- Store large arrays compactly in Rust/WASM memory (e.g. structure-of-arrays). Do not instantiate a million DOM elements or SVG circles.
+- Render using GPU batches/WebGL point sprites/instancing or an equivalently benchmarked batched renderer. At high zoom show small circular elements. At normal/low zoom, subpixel elements should merge visually into a continuous solid using a texture/grid/splatting technique. The particles must not disappear from physics when hidden by zoom.
+- Offer quality tiers such as 18k, 100k, 250k, 500k and a 1M target, but do not claim a tier works before benchmarking on the target browser. Use adaptive discretization/resolution, not hard-coded different outcomes.
+- Use local-neighbour/contact structures (spatial hash/grid or a suitable equivalent); do not compare every particle to every other particle (O(N^2)).
+- Separate render frame rate from physics time steps, and keep the interface responsive.
+- A million particles is an engineering/performance target, not a guarantee of physical accuracy. Validate resolution convergence.
+
+2D LIMITATIONS
+The model is a 2D cross-section. It cannot fully represent lateral flow, 3D fracture surfaces, off-plane fragmentation, asymmetric projectile yaw or all real-world shot phenomena. Choose and document plane-stress/plane-strain or other 2D assumptions, an out-of-plane depth/thickness convention and consistent mass assignment. Do not call the model an exact 3D reproduction.
+
+PART 3 — FIRST HISTORICAL TARGETS
+TARGET A: TIGER I UPPER FRONT / DRIVER-SUPERSTRUCTURE PLATE
+- Nominal plate thickness: 100 mm, measured perpendicular to the face.
+- Published slope: approximately 9 degrees from vertical (the source describes the driver plate as 100 mm at 9 degrees).
+- For a horizontal trajectory, geometric LOS thickness = 100 / cos(9 degrees) = about 101.2 mm.
+- Treat this as the upper front driver/superstructure plate coupon, not the entire Tiger I nose or all front surfaces. The Tiger I has separate frontal plates. A distinct 100 mm nose plate at about 25 degrees from vertical is included as a later/alternate geometry reference; do not confuse it with Target A.
+- Historic plate geometry source: https://tanks-encyclopedia.com/ww2/germany/panzer-vi_tiger.php
+
+TARGET B: TIGER II / KING TIGER UPPER HULL GLACIS
+- Nominal plate thickness: 150 mm, measured perpendicular to the face.
+- Published hull scheme: 150 mm at about 50 degrees from vertical, equivalent to a face angle of 40 degrees from horizontal.
+- For a horizontal trajectory, geometric LOS thickness = 150 / cos(50 degrees) = about 233.4 mm.
+- Store slope convention explicitly. Do not call the plate “50 degrees from horizontal.” Do not inflate nominal plate thickness to 233 mm; 233.4 mm is only the horizontal ray path through the sloping geometry.
+- Historic plate geometry source: https://tanks-encyclopedia.com/ww2/germany/panzer-vi_konigstiger.php
+
+GEOMETRY TESTS
+- The rotated plate body must physically have the correct perpendicular thickness. Do not fake slope by changing armour strength, deleting material, or applying a thickness multiplier.
+- Store both angle conventions: slope_from_vertical_deg and face_angle_from_horizontal_deg.
+- Test simple geometric LOS values against the formulas above.
+- Real test-coupon width, support boundary conditions and edge distance must be documented. Do not imply a small 2D coupon is a full-width 3D tank front.
+
+PART 4 — PzGr AMMUNITION PRESETS
+Use two historically matched configurations so the two tanks do not get the wrong round/gun pairing.
+
+A. TIGER I SETUP
+- Gun: 8.8 cm KwK 36 L/56.
+- Projectile: 8.8 cm Pzgr.39 (APCBC-HE-T).
+- Common reference values: 10.2 kg projectile mass; 773 m/s nominal muzzle velocity; some references list about 59 g explosive filler.
+- Reference: https://wikitanks.com/index.php?title=8%2C8_cm_KwK_36_L%2F56
+
+B. TIGER II SETUP
+- Gun: 8.8 cm KwK 43 L/71.
+- Projectile: 8.8 cm Pzgr.39/43 (APCBC-HE).
+- Common reference values: 10.16 kg projectile mass and 1,000 m/s nominal muzzle velocity.
+- Reference: https://tanks-encyclopedia.com/ww2/germany/panzer-vi_konigstiger.php
+
+Important distinctions:
+- These are projectile masses, not complete cartridge masses.
+- Muzzle velocity is not automatically impact velocity at a nonzero range. For the first milestone, either model projectile flight/drag or explicitly label an idealised muzzle-speed impact test.
+- Exact projectile length, detailed nose/cap geometry, cavity, fuze, wall thickness and material heat treatment must come from a dimensioned drawing/reference before being described as exact. Until then, label the visible and internal geometry as an approximate reconstruction.
+- To focus on structural impact, initially disable fuze/explosive detonation and run a documented kinetic-only solid-impact mode while preserving mass and impact state. Do not pretend HE filler is inert in real history; simply state this first solver doesn't model it yet.
+- Add an optional controlled-comparison mode that fires identical state on both plate geometries. Label that mode non-historical when the same round/velocity isn't appropriate to both guns.
+
+PART 5 — MATERIAL REALISM / TRACEABILITY
+- These are WWII German rolled armour plates, but the exact material values for the specific selected plate/lots aren't fully established in the public references used here.
+- Do not assign “modern RHA” properties and call them a 1:1 match.
+- A historical source discusses PP793/PP7182 specifications and chemistry for some early Tiger II turret plates. That does NOT automatically mean the upper hull glacis used that exact recipe. Source: https://porschecarshistory.com/wp-content/old/biblio/60/Germany%2Cs%20Tiger%20tanks%20-%20VK45.02%20to%20Tiger%20II.pdf
+- Active solver profiles need a clear status: documented, provisional, calibrated, or validated.
+- Separate sourced values from tuning parameters. Missing fields should stay missing/explicitly provisional, not be filled with random plausible values.
+- Use valid units and record temperature, strain rate, orientation, testing standard and uncertainty where known.
+
+PART 6 — REAL PHYSICS, NOT PRESET OUTCOMES
+The solver should calculate the event, then the UI may classify what happened.
+
+Required architecture:
+1. Convert target/projectile geometry into material elements and neighbour/connectivity data.
+2. Assign mass consistently from density, element area and documented out-of-plane depth or a validated mass mapping.
+3. Calculate internal material forces using one explicit, documented formulation.
+4. Handle contact between projectile, armour and fragments independently of original bonds.
+5. Evolve elastic/plastic response and internal state using documented numerical rules.
+6. Accumulate damage and remove bonds/connections irreversibly when the chosen failure criterion is met.
+7. Preserve fragment motion and contact after fracture.
+8. Record per-step diagnostics and energy terms.
+9. Determine stopped/rebound/perforated from resulting velocities and geometry, not ammunition-name if/else statements.
+
+Never:
+- Force penetration based on round name or a penetration lookup table.
+- Force ricochet at a fixed angle without the model producing it.
+- Spawn fragments from a canned effect while leaving the original material intact.
+- Skip contact when a bond breaks.
+- Hide numerical energy gain by falsifying the energy ledger or tuning reported totals.
+
+Energy accounting must match the chosen formulation. Track only meaningful, non-overlapping terms: kinetic, recoverable elastic, plastic work, fracture/damage work, contact potential if used, external constraints/work, thermal energy if implemented. A residual is diagnostic; the solver must explain it, and the test should use a justified tolerance.
+
+Start with mechanics that can be tested. Do not pretend heat, melting, detonation or explosive cavity behaviour are implemented until their physical model and tests exist.
+
+PART 7 — UI / RENDERING
+Design a clean, sleek, restrained engineering app:
+- Dark charcoal/neutral canvas, subtle grid, restrained single accent colour, clear typography and alignment.
+- The particle viewport must dominate the window.
+- Top bar: ArmorLab, current scenario and run state.
+- Compact experiment controls: Target, ammunition, Fire, Reset, Pause/Resume, speed, particle quality.
+- View modes: normal/material ID/damage/velocity; stress or temperature only when truly calculated.
+- Compact telemetry: physical time, wall-clock runtime, active count, energy ledger/residual, max displacement, fragment count and warnings.
+- Inspector: selected particle's actual material ID, coordinates, velocity, damage; display stress/strain only if computed.
+- At high zoom small circles should be visibly separate. At ordinary zoom, material should look continuous as the dots blend; do not increase radii so much that visuals misrepresent spacing.
+- Every control must work; no mock buttons, decorative charts with dummy values or fake damage.
+
+PART 8 — SOURCE PROJECT AND OFFLINE BUILD
+- Rust physics core, wasm32-unknown-unknown target, small JS/HTML/CSS UI.
+- Build command, preferably `npm run build`, creates a standalone `ArmorLab.html`.
+- Embed all WASM bytes, JS, CSS and preset data in that file.
+- Must work directly from file:// without a server, internet, CDN, remote fonts, sibling WASM or network fetches.
+- Do not require cross-origin isolation or SharedArrayBuffer for baseline mode. Worker/threading can be optional only after it is verified in a self-contained offline build.
+- Keep the repository organized: src, web, presets/data, tests, build scripts, docs and output. Avoid bulky build cache in the user ZIP.
+- Back up the current project before making destructive changes. Then build a clean source and keep a recoverable snapshot of useful work.
+
+PART 9 — ACCEPTANCE TESTS
+At minimum, implement and run tests for:
+- Tiger I thickness/angle and geometric LOS = about 101.2 mm.
+- Tiger II thickness/angle and geometric LOS = about 233.4 mm.
+- Actual rotated geometry preserves perpendicular nominal thickness.
+- Correct gun/projectile pairings, projectile masses and nominal muzzle-speed references.
+- Reset restores complete original simulation state.
+- Pairwise internal forces balance where required by the model.
+- Isolated collision obeys appropriate momentum/energy tolerances.
+- Contact remains after bond break.
+- Bonds fail irreversibly.
+- Fragment motion emerges from solver state.
+- No hard-coded hit-result paths.
+- Energy ledger is broken down by term and does not create unexplained jumps on fracture.
+- Multiple particle resolutions are tested; report convergence or lack of convergence.
+- Benchmark particle counts, time per simulated time unit, memory use and drops/failures.
+- Generated HTML includes WASM and all assets and opens via file:// without network access.
+
+PART 10 — DELIVERABLE
+Actually finish the project, not just write a design.
+Provide:
+1. Complete editable source.
+2. Automated tests and test output.
+3. README with exact setup/build/test commands.
+4. Physics-model document: equations, units, assumptions, limitations and calibration status.
+5. `ArmorLab.html` fully offline.
+6. A ZIP containing source/data/tests/docs/build scripts and HTML.
+
+The final report must distinguish what is implemented, what passed, what failed, and what remains provisional. Never say “1:1 realistic” unless actual test comparisons justify it.
+
+SOURCES / FACTUAL BASIS
+- Armor Sandbox official site: https://armorsandbox.com/
+- Armor Sandbox app description (explicit 2D cross-section and particle representation): https://apps.apple.com/au/app/armor-sandbox/id6821128741
+- Tiger I plate scheme: https://tanks-encyclopedia.com/ww2/germany/panzer-vi_tiger.php
+- Tiger II plate scheme and Pzgr.39/43 summary: https://tanks-encyclopedia.com/ww2/germany/panzer-vi_konigstiger.php
+- 8.8 cm KwK 36 / Pzgr.39 reference: https://wikitanks.com/index.php?title=8%2C8_cm_KwK_36_L%2F56
+- Tiger II historic armour metallurgy excerpt (early turret plate data only): https://porschecarshistory.com/wp-content/old/biblio/60/Germany%2Cs%20Tiger%20tanks%20-%20VK45.02%20to%20Tiger%20II.pdf
+- Additional Pzgr.39/43 reference: https://english.classicistranieri.com/en/8/2E/8/8.8_cm_KwK_43_cf43.html
+
+The attached CSV has the same facts as structured records and includes a detailed acceptance-test index. Use it as a checklist as you build.

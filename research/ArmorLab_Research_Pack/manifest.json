@@ -1,0 +1,18 @@
+{
+  "project": "ArmorLab",
+  "version": "0.2-research-pack",
+  "created": "2026-10-24",
+  "description": "Source-traceable historical ballistics research and simulation handoff. Penetration values are validation references only, never hard-coded impact decisions.",
+  "csv_files": [
+    "implementation_milestones.csv",
+    "armor_surfaces_and_samples.csv",
+    "ammunition_variants.csv",
+    "validation_cases.csv",
+    "image_and_drawing_references.csv",
+    "ammunition_mechanism_models.csv",
+    "historical_penetration_reference_curves.csv",
+    "material_and_solver_parameter_checklist.csv",
+    "source_register.csv"
+  ],
+  "source_count": 34
+}
