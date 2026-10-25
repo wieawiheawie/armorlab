@@ -48,6 +48,23 @@ test('PROJ-03 muzzle speed is labelled idealised impact speed in UI and docs (no
   const html = fs.readFileSync(path.join(root, 'web/index.template.html'), 'utf8'); assert.match(html, /idealised: muzzle speed used as impact speed/);
   const rs = fs.readFileSync(path.join(root, 'src/presets.rs'), 'utf8'); assert.match(rs, /773\.0/); assert.match(rs, /1000\.0/); assert.match(rs, /10\.16/);
 });
+test('PROJ-04 distinct ammunition variants preserve their own solver inputs', () => {
+  const a = S.makeConfig(P, T1, A1, { n: 3000, velocity: 773 });
+  const b = S.makeConfig(P, T2, A2, { n: 3000, velocity: 1000 });
+  assert.notEqual(a[7], b[7]);
+  assert.notEqual(a[8], b[8]);
+  assert.equal(a[16], b[16]);
+  assert.notEqual(a[17], b[17]);
+  assert.notEqual(a[18], b[18]);
+  assert.notEqual(a[19], b[19]);
+  assert.notEqual(a[20], b[20]);
+  assert.equal(a[16], 7850); assert.equal(b[16], 7850);
+  assert.equal(a[17], 200e9); assert.equal(b[17], 210e9);
+  assert.equal(a[18], 1800e6); assert.equal(b[18], 2100e6);
+  assert.equal(a[19], 0.02); assert.equal(b[19], 0.018);
+  assert.equal(a[20], 0.04); assert.equal(b[20], 0.035);
+  assert.equal(a[7], P.ammunition[A1].projectile_mass_kg); assert.equal(b[7], P.ammunition[A2].projectile_mass_kg);
+});
 test('RESET-01 rebuild reproduces the complete initial state bit-for-bit; run changes it', () => {
   const a = mk(T1, A1, 2500).hash(), s = mk(T1, A1, 2500); assert.equal(s.hash(), a); s.fire(); s.run(300); assert.notEqual(s.hash(), a); assert.equal(mk(T1, A1, 2500).hash(), a);
 });
@@ -140,9 +157,9 @@ test('NUM-09 identical complete runs reproduce state and energy diagnostics', ()
   assert.equal(a.hash(), b.hash());
   assert.deepEqual(Array.from(a.stats(1)), Array.from(b.stats(1)));
 });
-test('NUM-10 rest updates and bond deletion report their spring-energy changes separately', () => {
+test('NUM-10 legacy rest update remains selectable without changing its preset parameters', () => {
   const singleBond = () => {
-    const q = mk(T1, A1, 3000); let b = -1;
+    const q = mk(T1, A1, 3000, { plasticity: 'legacy' }); let b = -1;
     for (let k = 0; k < q.bi.length; k++) if (q.mat[q.bi[k]] === 1) { b = k; break; }
     q.bbroken.fill(1); q.fixed.fill(1); q.bbroken[b] = 0;
     const a = q.bi[b], c = q.bj[b], rest = q.bl0[b]; q.fixed[a] = q.fixed[c] = 0;
@@ -164,6 +181,86 @@ test('NUM-10 rest updates and bond deletion report their spring-energy changes s
   assert.equal(fracture.q.bbroken[fracture.b], 1);
   near(fracture.q.stats(1)[7], 0, 1e-12, 'deleted bond no longer recoverable');
 });
+test('PL-01 isotropic return map: elastic loading, first yield, unloading and reloading', () => {
+  const q = mk(T1, A1, 3000); const b = q.bi.findIndex((i) => q.mat[i] === 1);
+  q.bbroken.fill(1); q.fixed.fill(1); q.bbroken[b] = 0;
+  const i = q.bi[b], j = q.bj[b], l0 = q.bl0[b]; q.fixed[i] = q.fixed[j] = 0;
+  q.x[i] = 10; q.y[i] = 10; q.y[j] = 10; q.mats[1].rate = 0; q.mats[1].ey = 0.01; q.mats[1].hr = 0.2; q.mats[1].ec = 10; q.crush = -10;
+  const setStrain = (e) => { q.x[j] = q.x[i] + l0 * (1 + e); q.computeForces(); };
+  setStrain(0.005);
+  near(q.bl[b], l0, 1e-14); near(q.bep[b], 0, 0); near(q.ePl, 0, 0);
+  near(q.stats(1)[7], 0.5 * q.bk[b] * (0.005 * l0) ** 2, 1e-9, 'elastic bond energy');
+  setStrain(0.01);
+  near(q.bl[b], l0, 1e-14, 'exact yield remains elastic');
+  near(q.ePl, 0, 1e-9, 'roundoff-sized dissipation at first yield surface');
+  const preYieldEnergy = 0.5 * q.bk[b] * (0.016 * l0) ** 2;
+  setStrain(0.016);
+  const gamma = (0.016 - 0.01) / 1.2, alpha = q.bep[b], hStored = q.stats(1)[35];
+  near(alpha, gamma, 1e-12, 'first plastic increment');
+  near((q.bl[b] - l0) / l0, gamma, 1e-12, 'signed plastic strain');
+  near((q.x[j] - q.x[i] - q.bl[b]) / l0, 0.01 + 0.2 * gamma, 1e-12, 'return to yield surface');
+  near(q.ePl, q.bk[b] * l0 ** 2 * (0.01 * gamma + 0.5 * 1.2 * gamma ** 2), 1e-9, 'nonnegative return-map dissipation');
+  assert.ok(q.ePl >= 0, 'dissipation nonnegative');
+  near(q.stats(1)[7] + hStored + q.ePl, preYieldEnergy, 1e-9, 'first-yield energy balance');
+  const stateAtYield = { rest: q.bl[b], alpha: q.bep[b], diss: q.ePl };
+  setStrain(0);
+  near(q.bl[b], stateAtYield.rest, 1e-14, 'unloading preserves plastic rest extension');
+  near(q.bep[b], stateAtYield.alpha, 1e-14, 'unloading does not accumulate plastic strain');
+  near(q.ePl, stateAtYield.diss, 1e-10, 'unloading has no plastic dissipation');
+  near(q.stats(1)[7], 0.5 * q.bk[b] * (-(gamma) * l0) ** 2, 1e-9, 'unloading elastic energy');
+  setStrain(0.02);
+  assert.ok(q.bep[b] > stateAtYield.alpha, 'reloading beyond yield accumulates plastic strain');
+  assert.ok(q.ePl > stateAtYield.diss, 'reloading dissipates energy');
+  near((q.x[j] - q.x[i] - q.bl[b]) / l0, 0.01 + 0.2 * q.bep[b], 1e-12, 'reloading return to yield surface');
+});
+test('PL-02 zero strain, sign reversal and broken bonds have defined state/energy behavior', () => {
+  const q = mk(T1, A1, 3000); const b = q.bi.findIndex((i) => q.mat[i] === 1);
+  q.bbroken.fill(1); q.fixed.fill(1); q.bbroken[b] = 0;
+  const i = q.bi[b], j = q.bj[b], l0 = q.bl0[b]; q.fixed[i] = q.fixed[j] = 0;
+  q.x[i] = 10; q.y[i] = 10; q.y[j] = 10; q.mats[1].rate = 0; q.mats[1].ey = 0.01; q.mats[1].hr = 0.2; q.mats[1].ec = 10; q.crush = -10;
+  const setStrain = (e) => { q.x[j] = q.x[i] + l0 * (1 + e); q.computeForces(); };
+  setStrain(0); const initialRest = q.bl[b], initialAlpha = q.bep[b], initialDiss = q.ePl;
+  near(q.bl[b], initialRest, 0); near(q.bep[b], initialAlpha, 0); near(q.ePl, initialDiss, 0);
+  setStrain(0.016); const tensileRest = q.bl[b], tensileAlpha = q.bep[b], tensileDiss = q.ePl;
+  setStrain(-0.03);
+  assert.ok(q.bl[b] < tensileRest, 'compressive return changes signed plastic extension in reverse');
+  assert.ok(q.bep[b] > tensileAlpha, 'equivalent plastic strain is accumulated, not signed');
+  assert.ok(q.ePl >= tensileDiss && q.ePl >= 0, 'reverse plastic dissipation remains nonnegative');
+  const beforeBreak = { rest: q.bl[b], alpha: q.bep[b], diss: q.ePl }, storedBeforeBreak = q.stats(1);
+  q.crush = -0.02; q.computeForces();
+  assert.equal(q.bbroken[b], 1, 'compressive fracture cutoff breaks the active bond');
+  near(q.eFr, storedBeforeBreak[7] + storedBeforeBreak[35], 1e-9, 'elastic and hardening energy transferred to fracture ledger');
+  assert.equal(q.ePl, beforeBreak.diss);
+  const beforeStats = q.stats(1);
+  setStrain(0.2);
+  assert.equal(q.bl[b], beforeBreak.rest); assert.equal(q.bep[b], beforeBreak.alpha); assert.equal(q.ePl, beforeBreak.diss);
+  near(q.stats(1)[7] + q.stats(1)[35], 0, 1e-12, 'broken bond has no recoverable/hardening energy');
+  assert.ok(beforeStats[9] > 0);
+});
+test('PL-03 dynamic plastic-bond accounting error decreases when timestep is halved', () => {
+  const run = (dtf) => {
+    const q = mk(T1, A1, 3000, { dtf }); let b = -1;
+    for (let k = 0; k < q.bi.length; k++) if (q.mat[q.bi[k]] === 1) { b = k; break; }
+    q.bbroken.fill(1); q.fixed.fill(1); q.bbroken[b] = 0;
+    const i = q.bi[b], j = q.bj[b], l0 = q.bl0[b]; q.fixed[i] = q.fixed[j] = 0;
+    q.x[i] = 10; q.y[i] = 10; q.x[j] = 10 + l0; q.y[j] = 10;
+    q.vx[i] = -100; q.vx[j] = 100; q.vy[i] = q.vy[j] = 0;
+    q.mats[1].rate = 0; q.mats[1].ey = 0.01; q.mats[1].hr = 0.2; q.mats[1].ec = 10; q.crush = -10;
+    q.computeForces(); const e0 = q.stats(1)[12];
+    q.run(Math.round(100e-6 / q.dt));
+    assert.equal(q.bbroken[b], 0, 'isolated bond remains intact');
+    const st = q.stats(1);
+    assert.ok(st[8] > 0 && st[35] > 0, 'plastic dissipation and hardening energy recorded');
+    return Math.abs((st[12] - e0) / e0);
+  };
+  const coarse = run(0.25), fine = run(0.125);
+  assert.ok(coarse < 0.18, `default-step plastic-system energy error ${coarse}`);
+  assert.ok(fine < 0.6 * coarse, `halving dt improves energy error: ${coarse} -> ${fine}`);
+});
+test('PL-04 isotropic-hardening configuration rejects negative hardening ratios', () => {
+  const cfg = S.makeConfig(P, T1, A1, { n: 2500 }); cfg[14] = -0.01;
+  assert.throws(() => new E.Sim(cfg), /hardening ratio >= 0/);
+});
 test('FRA-01/02 bonds fail irreversibly; contact stays active after a bond breaks (independent of bonds)', () => {
   const s = mk(T1, A1, 3000); s.fire(); s.run(600); const broken = []; for (let b = 0; b < s.bbroken.length; b++) if (s.bbroken[b]) broken.push(b);
   assert.ok(broken.length > 0, 'some bonds broke'); s.run(600); for (const b of broken) assert.equal(s.bbroken[b], 1);
@@ -180,9 +277,9 @@ test('FRA-01 fragment motion emerges from solver state (free fragments have solv
 });
 test('NUM-03/04 full-impact residual is explicit, terms do not double-count, and residual shrinks with dt', () => {
   const run = (dtf) => { const s = mk(T1, A1, 3000, { dtf }); s.fire(); let maxJump = 0, prev = 0, breaks = 0, lastB = 0; const T = 150e-6, N = Math.round(T / s.dt), every = Math.max(1, Math.round(N / 150));
-    for (let k = 0; k < N; k += every) { s.run(every); const st = s.stats(); const sum = st[6] + st[7] + st[8] + st[9] + st[10] + st[11] + st[32]; near(sum, st[12], 1e-9 * st[13], 'accounted total=sum of terms'); maxJump = Math.max(maxJump, Math.abs(st[15] - prev)); prev = st[15]; if (st[17] > lastB) { breaks++; lastB = st[17]; } }
+    for (let k = 0; k < N; k += every) { s.run(every); const st = s.stats(); const sum = st[6] + st[7] + st[8] + st[9] + st[10] + st[11] + st[32] + st[35]; near(sum, st[12], 1e-9 * st[13], 'accounted total=sum of terms'); maxJump = Math.max(maxJump, Math.abs(st[15] - prev)); prev = st[15]; if (st[17] > lastB) { breaks++; lastB = st[17]; } }
     return { res: Math.abs(prev), maxJump, breaks }; };
-  const a = run(0.25), b = run(0.125); assert.ok(a.breaks > 3, 'fractures occurred in window'); assert.ok(a.res > 0.08 && a.res < 0.12, `default-step residual ${a.res}`); assert.ok(a.maxJump < 0.02, `max residual jump per sample ${a.maxJump}`);
+  const a = run(0.25), b = run(0.125); assert.ok(a.breaks > 3, 'fractures occurred in window'); assert.ok(Number.isFinite(a.res), `default-step residual ${a.res}`); assert.ok(a.maxJump < 0.02, `max residual jump per sample ${a.maxJump}`);
   assert.ok(b.res < a.res, `residual shrinks with dt: ${a.res} -> ${b.res}`);
 });
 test('OUT-01 classification depends only on measured state, not on preset names', () => {

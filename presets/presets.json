@@ -30,6 +30,9 @@
       "projectile_mass_kg": 10.2, "nominal_muzzle_velocity_mps": 773.0, "calibre_mm": 88.0, "listed_filler_g": 59.0,
       "research_id": "DE_88_KWK36_PZGR39_1",
       "length_mm": 250.0, "nose_length_mm": 90.0, "material": "PROJECTILE_PROVISIONAL",
+      "projectile_density_kg_m3": 7850.0, "projectile_youngs_modulus_pa": 200e9, "projectile_yield_stress_pa": 1800e6,
+      "projectile_hardening_ratio_h_over_e": 0.02, "projectile_critical_tensile_bond_strain": 0.04,
+      "projectile_material_status": "ESTIMATE: generic hardened steel values; no traceable exact shell-grade or ballistic-material source for this projectile variant.",
       "shape_fidelity": "APPROXIMATE silhouette (elliptical nose + cylinder), solid; no cap, cavity, fuze or filler. Length/nose are ArmorLab placeholders, NOT sourced.",
       "solver_mode": "kinetic-only; fuze/explosive disabled",
       "source": "https://wikitanks.com/index.php?title=8%2C8_cm_KwK_36_L%2F56"
@@ -39,6 +42,9 @@
       "projectile_mass_kg": 10.16, "nominal_muzzle_velocity_mps": 1000.0, "calibre_mm": 88.0, "listed_filler_g": null,
       "research_id": "DE_88_KWK43_PZGR39_43",
       "length_mm": 250.0, "nose_length_mm": 90.0, "material": "PROJECTILE_PROVISIONAL",
+      "projectile_density_kg_m3": 7850.0, "projectile_youngs_modulus_pa": 210e9, "projectile_yield_stress_pa": 2100e6,
+      "projectile_hardening_ratio_h_over_e": 0.018, "projectile_critical_tensile_bond_strain": 0.035,
+      "projectile_material_status": "ESTIMATE: generic hardened steel values; exact grade, heat treatment and cap/body material split are not source-traced for the 39/43 projectile.",
       "shape_fidelity": "APPROXIMATE silhouette (elliptical nose + cylinder), solid; no cap, cavity, fuze or filler. Length/nose are ArmorLab placeholders, NOT sourced.",
       "solver_mode": "kinetic-only; fuze/explosive disabled",
       "source": "https://tanks-encyclopedia.com/ww2/germany/panzer-vi_konigstiger.php"

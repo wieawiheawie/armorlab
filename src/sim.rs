@@ -3,7 +3,7 @@
 //! NOTE: this file mirrors web/engine_js.js step for step.
 
 pub const CFG_LEN: usize = 24;
-pub const STAT_LEN: usize = 35;
+pub const STAT_LEN: usize = 36;
 
 // cfg indices
 pub const C_N: usize = 0;
@@ -16,6 +16,7 @@ pub const C_NOSE: usize = 6;
 pub const C_PMASS: usize = 7;
 pub const C_V: usize = 8;
 pub const C_SUPPORT: usize = 9; // 0 clamped ends, 1 free
+pub const C_PLASTICITY: usize = 10; // 0 legacy rest update, 1 isotropic-hardening return map
 pub const C_PL_RHO: usize = 11;
 pub const C_PL_E: usize = 12;
 pub const C_PL_SY: usize = 13;
@@ -50,6 +51,7 @@ pub struct Sim {
     pub steps: u64,
     pub fired: bool,
     pub v_impact: f64,
+    pub plasticity_model: u8,
     pub crush: f64,
     pub kc: f64,
     pub plate_t: f64,
@@ -112,6 +114,7 @@ pub struct Sim {
     np: usize,
     // cached slow diagnostics
     d_eel: f64,
+    d_ehard: f64,
     d_ect: f64,
     d_fc: u64,
     d_fp: u64,
@@ -131,6 +134,34 @@ impl Sim {
 
     /// contact_mode: 1 = Verlet neighbour list (default, matches the JS engine), 0 = grid rebuilt every call (reference)
     pub fn build_with(cfg: &[f64], contact_mode: u8) -> Sim {
+        assert!(cfg.len() >= CFG_LEN, "ArmorLab: config must contain at least {CFG_LEN} values");
+        assert!(cfg[C_N].is_finite() && cfg[C_N] > 0.0, "ArmorLab: particle count must be finite and > 0");
+        assert!(cfg[C_T].is_finite() && cfg[C_T] > 0.0, "ArmorLab: target thickness must be finite and > 0");
+        assert!(cfg[C_SLOPE].is_finite() && (0.0..=90.0).contains(&cfg[C_SLOPE]), "ArmorLab: target slope must be finite and within [0°, 90°]");
+        assert!(cfg[C_FACE].is_finite() && cfg[C_FACE] > 0.0, "ArmorLab: face length must be finite and > 0");
+        assert!(cfg[C_CAL].is_finite() && cfg[C_CAL] > 0.0, "ArmorLab: projectile caliber must be finite and > 0");
+        assert!(cfg[C_PLEN].is_finite() && cfg[C_PLEN] > 0.0, "ArmorLab: projectile length must be finite and > 0");
+        assert!(cfg[C_NOSE].is_finite() && cfg[C_NOSE] >= 0.0, "ArmorLab: nose length must be finite and >= 0");
+        assert!(cfg[C_PMASS].is_finite() && cfg[C_PMASS] > 0.0, "ArmorLab: projectile mass must be finite and > 0");
+        assert!(cfg[C_V].is_finite() && cfg[C_V] >= 0.0, "ArmorLab: impact speed must be finite and >= 0");
+        assert!(cfg[C_SUPPORT].is_finite() && (cfg[C_SUPPORT] == 0.0 || cfg[C_SUPPORT] == 1.0), "ArmorLab: support mode must be 0 (clamped) or 1 (free)");
+        assert!(cfg[C_KC].is_finite() && cfg[C_KC] > 0.0, "ArmorLab: contact stiffness must be finite and > 0");
+        assert!(cfg[C_DTF].is_finite() && cfg[C_DTF] > 0.0, "ArmorLab: timestep factor must be finite and > 0");
+        assert!(cfg[C_CRUSH].is_finite() && cfg[C_CRUSH] < 0.0, "ArmorLab: compressive crush cutoff must be negative");
+        for (_, value, value_name) in [
+            (C_PL_RHO, cfg[C_PL_RHO], "plate density"),
+            (C_PL_E, cfg[C_PL_E], "plate modulus"),
+            (C_PL_SY, cfg[C_PL_SY], "plate yield stress"),
+            (C_PL_EC, cfg[C_PL_EC], "plate critical strain"),
+            (C_PR_RHO, cfg[C_PR_RHO], "projectile density"),
+            (C_PR_E, cfg[C_PR_E], "projectile modulus"),
+            (C_PR_SY, cfg[C_PR_SY], "projectile yield stress"),
+            (C_PR_EC, cfg[C_PR_EC], "projectile critical strain"),
+        ] {
+            assert!(value.is_finite() && value > 0.0, "ArmorLab: {value_name} must be finite and > 0");
+        }
+        assert!(cfg[C_PL_HR].is_finite() && cfg[C_PL_HR] >= 0.0, "ArmorLab: hardening ratio >= 0");
+        assert!(cfg[C_PR_HR].is_finite() && cfg[C_PR_HR] >= 0.0, "ArmorLab: hardening ratio >= 0");
         let t = cfg[C_T];
         let s = cfg[C_SLOPE].to_radians();
         let tan = [s.sin(), s.cos()];
@@ -201,6 +232,13 @@ impl Sim {
             Mat { rho: cfg[C_PL_RHO], e: cfg[C_PL_E], ey: cfg[C_PL_SY] / cfg[C_PL_E], hr: cfg[C_PL_HR], ec: cfg[C_PL_EC], rate: 0.015 * (1.0 + cfg[C_PL_SY] / cfg[C_PL_E]) },
             Mat { rho: cfg[C_PR_RHO], e: cfg[C_PR_E], ey: cfg[C_PR_SY] / cfg[C_PR_E], hr: cfg[C_PR_HR], ec: cfg[C_PR_EC], rate: 0.015 * (1.0 + cfg[C_PR_SY] / cfg[C_PR_E]) },
         ];
+        let plasticity_model = if cfg[C_PLASTICITY] >= 0.5 { 1 } else { 0 };
+        if plasticity_model == 1 {
+            for m in mats {
+                assert!(m.e.is_finite() && m.e > 0.0 && m.ey.is_finite() && m.ey >= 0.0 && m.hr.is_finite() && m.hr >= 0.0,
+                    "ArmorLab: isotropic plasticity requires finite E > 0, yield strain >= 0, and hardening ratio >= 0");
+            }
+        }
         let n_proj = n - n_plate;
         // out-of-plane depth so that projectile mass equals the preset exactly
         let dz = cfg[C_PMASS] / (mats[1].rho * h * h * n_proj as f64);
@@ -222,6 +260,7 @@ impl Sim {
             steps: 0,
             fired: false,
             v_impact: cfg[C_V],
+            plasticity_model,
             crush: cfg[C_CRUSH],
             kc,
             plate_t: t,
@@ -280,6 +319,7 @@ impl Sim {
             pj: vec![],
             np: 0,
             d_eel: 0.0,
+            d_ehard: 0.0,
             d_ect: 0.0,
             d_fc: 0,
             d_fp: 0,
@@ -473,7 +513,10 @@ impl Sim {
             let strain = (r - l0) / l0;
             if strain > m.ec || strain < self.crush {
                 let de = r - self.bl[b];
-                self.e_fr += 0.5 * k * de * de;
+                let hardening_energy = if self.plasticity_model == 1 {
+                    0.5 * k * l0 * l0 * m.hr * self.bep[b] * self.bep[b]
+                } else { 0.0 };
+                self.e_fr += 0.5 * k * de * de + hardening_energy;
                 self.bbroken[b] = 1;
                 self.nb_broken[i] += 1;
                 self.nb_broken[j] += 1;
@@ -485,15 +528,35 @@ impl Sim {
                 continue;
             }
             let mut de = r - self.bl[b];
-            let yield_limit = (m.ey + m.hr * self.bep[b]) * l0;
-            if de.abs() > yield_limit {
-                let sgn = if de > 0.0 { 1.0 } else { -1.0 };
-                let exc = de - sgn * yield_limit;
-                self.bl[b] += exc;
-                self.bep[b] += exc.abs() / l0;
-                let dn = de - exc;
-                self.e_pl += 0.5 * k * (de * de - dn * dn);
-                de = dn;
+            if self.plasticity_model == 0 {
+                let yield_limit = (m.ey + m.hr * self.bep[b]) * l0;
+                if de.abs() > yield_limit {
+                    let sgn = if de > 0.0 { 1.0 } else { -1.0 };
+                    let exc = de - sgn * yield_limit;
+                    self.bl[b] += exc;
+                    self.bep[b] += exc.abs() / l0;
+                    let dn = de - exc;
+                    self.e_pl += 0.5 * k * (de * de - dn * dn);
+                    de = dn;
+                }
+            } else {
+                let h = m.hr;
+                let alpha = self.bep[b];
+                let trial_strain = de / l0;
+                let yield_strain = m.ey + h * alpha;
+                let gamma = ((trial_strain.abs() - yield_strain) / (1.0 + h)).max(0.0);
+                if gamma > 0.0 {
+                    let sign = trial_strain.signum();
+                    let old_alpha = alpha;
+                    let new_alpha = old_alpha + gamma;
+                    let new_de = sign * l0 * (yield_strain + h * gamma);
+                    let elastic_drop = 0.5 * k * (de * de - new_de * new_de);
+                    let hardening_increase = 0.5 * k * l0 * l0 * h * (new_alpha * new_alpha - old_alpha * old_alpha);
+                    self.bl[b] += sign * gamma * l0;
+                    self.bep[b] = new_alpha;
+                    self.e_pl += (elastic_drop - hardening_increase).max(0.0);
+                    de = new_de;
+                }
             }
             let viscous = m.rate * rel_n;
             damping_power += m.rate * r * rel_n * rel_n;
@@ -724,6 +787,7 @@ impl Sim {
         }
         if level >= 1 {
         let mut eel = 0.0;
+        let mut ehard = 0.0;
         let mut nbk = 0u64;
         for b in 0..self.bi.len() {
             if self.bbroken[b] != 0 {
@@ -736,17 +800,23 @@ impl Sim {
             let dy = self.y[j] - self.y[i];
             let de = (dx * dx + dy * dy).sqrt() - self.bl[b];
             eel += 0.5 * self.bk[b] * de * de;
+            if self.plasticity_model == 1 {
+                let m = self.mats[self.bm[b] as usize];
+                ehard += 0.5 * self.bk[b] * self.bl0[b] * self.bl0[b] * m.hr * self.bep[b] * self.bep[b];
+            }
         }
         let ect = self.contact(true);
         self.n_broken = nbk;
         self.d_eel = eel;
+        self.d_ehard = ehard;
         self.d_ect = ect;
         self.d_energy_step = self.steps as i64;
         self.d_energy_time = self.time;
         }
         let eel = self.d_eel;
+        let ehard = self.d_ehard;
         let ect = self.d_ect;
-        let total = ke + eel + self.e_pl + self.e_fr + ect + self.e_damp;
+        let total = ke + eel + ehard + self.e_pl + self.e_fr + ect + self.e_damp;
         let (mut px, mut py) = (0.0, 0.0);
         for i in 0..self.n {
             px += self.mass[i] * self.vx[i];
@@ -850,6 +920,7 @@ impl Sim {
         s[32] = self.e_damp;
         s[33] = px;
         s[34] = py;
+        s[35] = ehard;
         s
     }
 
@@ -902,6 +973,7 @@ impl Sim {
         for b in 0..self.bi.len() {
             mix(self.bbroken[b] as u64);
             mix(self.bl[b].to_bits());
+            mix(self.bep[b].to_bits());
         }
         mix(self.e_pl.to_bits());
         mix(self.e_fr.to_bits());
