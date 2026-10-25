@@ -115,13 +115,13 @@ function refresh() {
   $('outcome').innerHTML = `<b>${o.label}${st.done ? '' : (st.started ? ' (live, run not finished)' : '')}</b><div class="note">${o.detail}</div>`;
   $('tele').innerHTML = row('sim time', fmt(S[0] * 1e6, 1) + ' µs') + row('wall-clock run', fmt(st.wall, 1) + ' s') + row('particles (all active)', S[2]) + row('plate / projectile', `${S[29]} / ${S[30]}`) +
     row('bonds intact / total', `${S[16] - S[17]} / ${S[16]}`) + row('mean / max plate disp.', `${fmt(S[18] * 1000)} / ${fmt(S[19] * 1000)} mm`) + row('fragments (count / particles) <span class="note">as of ' + (A.fragStep < 0 ? 'n/a' : us(A.fragTime || 0)) + '</span>', `${S[20]} / ${S[21]}`) +
-    row('projectile centroid v', fmt(S[22], 1) + ' m/s') + row('mass behind rear face', fmt(S[24] * 100, 1) + ' %') + row('max depth from front face', fmt(S[25] * 1000, 1) + ' mm') +
+    row('projectile centroid v', fmt(S[22], 1) + ' m/s') + row('total momentum x, y (fixed nodes have zero v)', `${fmt(S[33])}, ${fmt(S[34])} kg·m/s`) + row('mass behind rear face', fmt(S[24] * 100, 1) + ' %') + row('max depth from front face', fmt(S[25] * 1000, 1) + ' mm') +
     row('dt / spacing h', `${(S[5] * 1e9).toFixed(0)} ns / ${(S[3] * 1000).toFixed(2)} mm`) + row('out-of-plane depth dz', fmt(S[4] * 1000, 1) + ' mm') + row('steps', S[1]);
-  $('energyH').textContent = 'Energy ledger (J) — as of ' + (A.energyStep < 0 ? 'n/a' : us(A.energyTime || 0) + ' sim time (refreshed ~1 Hz / on pause)'); $('energy').innerHTML = row('kinetic', fmt(S[6])) + row('elastic (bond)', fmt(S[7])) + row('plastic work', fmt(S[8])) + row('fracture (bond break)', fmt(S[9])) + row('contact potential', fmt(S[10])) +
-    row('external (constraints)', fmt(S[11])) + `<tr class="sum"><td>total</td><td>${fmt(S[12])}</td></tr>` + row('initial KE', fmt(S[13])) + row('residual (diagnostic)', `${fmt(S[14])} (${fmt(S[15] * 100)} %)`);
+  $('energyH').textContent = 'Energy accounting (J; damping estimated) — as of ' + (A.energyStep < 0 ? 'n/a' : us(A.energyTime || 0) + ' sim time (refreshed ~1 Hz / on pause)'); $('energy').innerHTML = row('kinetic (measured)', fmt(S[6])) + row('recoverable elastic bond energy (calculated)', fmt(S[7])) + row('plastic rest-update energy drop (calculated)', fmt(S[8])) + row('released bond energy assigned to fracture (calculated)', fmt(S[9])) + row('contact potential (calculated)', fmt(S[10])) +
+    row('viscous damping loss (estimated)', fmt(S[32])) + row('external constraint work (zero: fixed nodes do not move)', fmt(S[11])) + `<tr class="sum"><td>accounted total</td><td>${fmt(S[12])}</td></tr>` + row('initial KE', fmt(S[13])) + row('unaccounted residual (diagnostic)', `${fmt(S[14])} (${fmt(S[15] * 100)} %)`));
   const w = [];
   if (!SC.isHistorical(P, $('target').value, $('ammo').value)) w.push('<span class="warn">Comparison mode: round/gun not historically paired with this plate.</span>');
-  if (Math.abs(S[15]) > 0.05) w.push('<span class="bad">Energy residual above 5%: numerical error, treat results with caution.</span>');
+  if (Math.abs(S[15]) > 0.05) w.push('<span class="bad">Unaccounted energy residual above 5%: numerical and model energy paths are not closed; do not interpret this as energy conservation.</span>');
   w.push('Materials PROVISIONAL (not plate-specific); projectile shape APPROXIMATE; kinetic-only (no fuze/filler); 2D slab model. Not a 1:1 ballistic prediction.');
   w.push(`Build ${window.ARMORLAB_BUILD}; scenario build ${st.buildMs.toFixed(0)} ms; upload last frame ${st.rendMs.toFixed(1)} ms.`);
   $('warn').innerHTML = w.join('<br>');

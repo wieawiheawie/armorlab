@@ -3,7 +3,7 @@
 //! NOTE: this file mirrors web/engine_js.js step for step.
 
 pub const CFG_LEN: usize = 24;
-pub const STAT_LEN: usize = 32;
+pub const STAT_LEN: usize = 35;
 
 // cfg indices
 pub const C_N: usize = 0;
@@ -79,6 +79,8 @@ pub struct Sim {
     pub mats: [Mat; 2],
     pub e_pl: f64,
     pub e_fr: f64,
+    pub e_damp: f64,
+    damping_power: f64,
     pub ke0: f64,
     // grid
     cs: f64,
@@ -249,6 +251,8 @@ impl Sim {
             mats,
             e_pl: 0.0,
             e_fr: 0.0,
+            e_damp: 0.0,
+            damping_power: 0.0,
             ke0: 0.0,
             cs: 1.5 * h,
             gx0: 0.0,
@@ -445,6 +449,7 @@ impl Sim {
 
     /// bond state update (fracture, plasticity) + force evaluation (bonds, contact)
     pub fn compute_forces(&mut self) {
+        let mut damping_power = 0.0;
         for i in 0..self.n {
             self.fx[i] = 0.0;
             self.fy[i] = 0.0;
@@ -487,10 +492,11 @@ impl Sim {
                 self.bl[b] += exc;
                 self.bep[b] += exc.abs() / l0;
                 let dn = de - exc;
-                self.e_pl += k * dn.abs() * exc.abs();
+                self.e_pl += 0.5 * k * (de * de - dn * dn);
                 de = dn;
             }
             let viscous = m.rate * rel_n;
+            damping_power += m.rate * r * rel_n * rel_n;
             let f = (k * de / r) + viscous;
             self.fx[i] += f * dx;
             self.fy[i] += f * dy;
@@ -500,6 +506,7 @@ impl Sim {
         if self.pending_dead > 512 && self.pending_dead * 50 > self.n_act {
             self.compact_active();
         }
+        self.damping_power = damping_power;
         self.contact(false);
     }
 
@@ -636,10 +643,12 @@ impl Sim {
             ke += 0.5 * self.mass[i] * v * v;
         }
         self.ke0 = ke;
+        self.damping_power = self.active_damping_power();
     }
 
     pub fn step(&mut self) {
         let dt = self.dt;
+        let damping_power_start = self.damping_power;
         for i in 0..self.n {
             if self.fixed[i] != 0 {
                 continue;
@@ -650,6 +659,7 @@ impl Sim {
             self.y[i] += dt * self.vy[i];
         }
         self.compute_forces();
+        self.e_damp += 0.5 * dt * (damping_power_start + self.damping_power);
         for i in 0..self.n {
             if self.fixed[i] != 0 {
                 continue;
@@ -736,7 +746,12 @@ impl Sim {
         }
         let eel = self.d_eel;
         let ect = self.d_ect;
-        let total = ke + eel + self.e_pl + self.e_fr + ect;
+        let total = ke + eel + self.e_pl + self.e_fr + ect + self.e_damp;
+        let (mut px, mut py) = (0.0, 0.0);
+        for i in 0..self.n {
+            px += self.mass[i] * self.vx[i];
+            py += self.mass[i] * self.vy[i];
+        }
         let (mut sd, mut md) = (0.0f64, 0.0f64);
         for i in 0..self.n_plate {
             let d = ((self.x[i] - self.x0[i]).powi(2) + (self.y[i] - self.y0[i]).powi(2)).sqrt();
@@ -832,7 +847,27 @@ impl Sim {
         s[29] = self.n_plate as f64;
         s[30] = (self.n - self.n_plate) as f64;
         s[31] = if self.fired { 1.0 } else { 0.0 };
+        s[32] = self.e_damp;
+        s[33] = px;
+        s[34] = py;
         s
+    }
+
+    fn active_damping_power(&self) -> f64 {
+        let mut power = 0.0;
+        for ar in 0..self.n_act {
+            let b = self.act[ar] as usize;
+            if self.bbroken[b] != 0 { continue; }
+            let i = self.bi[b] as usize;
+            let j = self.bj[b] as usize;
+            let dx = self.x[j] - self.x[i];
+            let dy = self.y[j] - self.y[i];
+            let r = (dx * dx + dy * dy).sqrt().max(1e-12);
+            let rel_n = (dx * (self.vx[j] - self.vx[i]) + dy * (self.vy[j] - self.vy[i])) / (r + 1e-12);
+            let rate = self.mats[self.bm[b] as usize].rate;
+            power += rate * r * rel_n * rel_n;
+        }
+        power
     }
 
     /// positions every call; material is static and damage is maintained incrementally (see dmg_gen); speed only when asked
@@ -870,6 +905,7 @@ impl Sim {
         }
         mix(self.e_pl.to_bits());
         mix(self.e_fr.to_bits());
+        mix(self.e_damp.to_bits());
         hh
     }
 }

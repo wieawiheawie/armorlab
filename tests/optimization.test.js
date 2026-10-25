@@ -71,6 +71,6 @@ test('OPT-11 real Rust/WASM engine matches JS within tolerance and exposes the s
   const c = cfg(3000), J = new E.Sim(c), W = new w.Sim(c); J.fire(); W.fire(); assert.equal(J.n, W.n); J.run(400); W.run(400); const a = J.stats(2), b = W.stats(2);
   assert.equal(W.steps, J.steps, `steps mismatch: wasm ${W.steps} js ${J.steps}`);
   assert.ok(Math.abs(W.time - J.time) <= 1e-9 || Math.abs(W.time - J.time) <= 1e-6 * Math.max(1, Math.abs(J.time)), `time mismatch: wasm ${W.time} js ${J.time}`);
-  for (const i of [2, 16, 6, 7, 8, 9, 12, 17, 20, 22, 25]) assert.ok(rel(a[i], b[i]) < 2e-3, `stat ${i}: js ${a[i]} wasm ${b[i]}`);
+  for (const i of [2, 16, 6, 7, 8, 9, 12, 17, 20, 22, 25, 32, 33, 34]) assert.ok(rel(a[i], b[i]) < 2e-3, `stat ${i}: js ${a[i]} wasm ${b[i]}`);
   const r = new Runner(() => {}, {}); const ok = r._parity ? r._parity.call({ opts: {} }, w.Sim) : null; assert.ok(ok.pass, ok.why);
 });

@@ -2,7 +2,7 @@
 (function (root) {
 'use strict';
 const I = { N:0,T:1,SLOPE:2,FACE:3,CAL:4,PLEN:5,NOSE:6,PMASS:7,V:8,SUPPORT:9,PL_RHO:11,PL_E:12,PL_SY:13,PL_HR:14,PL_EC:15,PR_RHO:16,PR_E:17,PR_SY:18,PR_HR:19,PR_EC:20,KC:21,DTF:22,CRUSH:23 };
-const STAT_NAMES = ['time','steps','n','h','dz','dt','ke','e_el','e_pl','e_fr','e_ct','e_ext','e_total','ke0','resid','resid_rel','bonds','bonds_broken','mean_disp','max_disp','frag_count','frag_particles','proj_vx','proj_vy','proj_behind','proj_depth','proj_mass','plate_mass','max_speed','n_plate','n_proj','fired'];
+const STAT_NAMES = ['time','steps','n','h','dz','dt','ke','e_el','e_pl','e_fr','e_ct','e_ext','e_total','ke0','resid','resid_rel','bonds','bonds_broken','mean_disp','max_disp','frag_count','frag_particles','proj_vx','proj_vy','proj_behind','proj_depth','proj_mass','plate_mass','max_speed','n_plate','n_proj','fired','e_damp','momentum_x','momentum_y'];
 
 class Sim {
   constructor(cfg, opts) {
@@ -50,7 +50,7 @@ class Sim {
     this.kc = cfg[I.KC] * kmax;
     this.dt = cfg[I.DTF] * Math.sqrt(Math.min(this.mass[0], this.mass[n - 1]) / kmax);
     this.nbTotal = new Uint32Array(n); this.nbBroken = new Uint32Array(n);
-    this.ePl = 0; this.eFr = 0; this.ke0 = 0; this.nBrokenCount = 0; this.dmgGen = 0;
+    this.ePl = 0; this.eFr = 0; this.eDamp = 0; this.dampingPower = 0; this.ke0 = 0; this.nBrokenCount = 0; this.dmgGen = 0;
     this.cs = 1.5 * h; this._setupGrid(); this._buildBonds();
     // render buffers: material is static (written once), damage is updated incrementally when a bond breaks
     this.rPos = new Float32Array(2 * n); this.rMat = new Float32Array(n); this.rDmg = new Float32Array(n); this.rSpd = new Float32Array(n);
@@ -130,7 +130,7 @@ class Sim {
   computeForces() {
     const T = this.timers, t0 = T ? performance.now() : 0;
     const { x, y, vx, vy, fx, fy, bi, bj, bk, bl0, bl, bep, bm, bbroken, mats, crush, act, nbTotal, nbBroken, rDmg } = this;
-    fx.fill(0); fy.fill(0);
+    fx.fill(0); fy.fill(0); let dampingPower = 0;
     for (let r = 0, na = this.nAct; r < na; r++) {
       const b = act[r]; if (bbroken[b]) continue;
       const i = bi[b], j = bj[b], dx = x[j] - x[i], dy = y[j] - y[i];
@@ -147,13 +147,15 @@ class Sim {
       if (Math.abs(de) > yieldLimit) {
         const sgn = de > 0 ? 1 : -1, exc = de - sgn * yieldLimit;
         bl[b] += exc; bep[b] += Math.abs(exc) / l0;
-        const dn = de - exc; this.ePl += k * Math.abs(dn) * Math.abs(exc); de = dn; /* work-conjugate plastic work */
+        const dn = de - exc; this.ePl += 0.5 * k * (de * de - dn * dn); de = dn;
       }
       const viscous = m.rate * relN;
+      dampingPower += m.rate * rr * relN * relN;
       const f = (k * de / rr) + viscous;
       fx[i] += f * dx; fy[i] += f * dy; fx[j] -= f * dx; fy[j] -= f * dy;
     }
     if (this.pendingDead > 512 && this.pendingDead * 50 > this.nAct) this._compactActive(); // compact only when >2% of the list is dead
+    this.dampingPower = dampingPower;
     if (T) { const t1 = performance.now(); T.bonds = (T.bonds || 0) + t1 - t0; this._contact(false); T.contact = (T.contact || 0) + performance.now() - t1; } else this._contact(false);
   }
   // ---- contact. 'grid': rebuild every call (reference). 'verlet': candidate pair list within h+skin, rebuilt only when some particle moved >= skin/2 since the last build.
@@ -231,13 +233,25 @@ class Sim {
   fire() {
     if (this.fired) return; this.fired = true; let ke = 0;
     for (let i = this.nPlate; i < this.n; i++) { this.vx[i] = this.vImpact; ke += 0.5 * this.mass[i] * this.vImpact * this.vImpact; }
-    this.ke0 = ke;
+    this.ke0 = ke; this.dampingPower = this._activeDampingPower();
+  }
+  _activeDampingPower() {
+    let power = 0;
+    for (let r = 0; r < this.nAct; r++) {
+      const b = this.act[r]; if (this.bbroken[b]) continue;
+      const i = this.bi[b], j = this.bj[b], dx = this.x[j] - this.x[i], dy = this.y[j] - this.y[i];
+      const rr = Math.max(Math.sqrt(dx * dx + dy * dy), 1e-12), relN = (dx * (this.vx[j] - this.vx[i]) + dy * (this.vy[j] - this.vy[i])) / (rr + 1e-12);
+      power += this.mats[this.bm[b]].rate * rr * relN * relN;
+    }
+    return power;
   }
   step() {
     const { n, x, y, vx, vy, fx, fy, mass, fixed, dt } = this, T = this.timers, t0 = T ? performance.now() : 0;
+    const dampingPowerStart = this.dampingPower;
     for (let i = 0; i < n; i++) { if (fixed[i]) continue; vx[i] += 0.5 * dt * fx[i] / mass[i]; vy[i] += 0.5 * dt * fy[i] / mass[i]; x[i] += dt * vx[i]; y[i] += dt * vy[i]; }
     const t1 = T ? performance.now() : 0;
     this.computeForces();
+    this.eDamp += 0.5 * dt * (dampingPowerStart + this.dampingPower);
     const t2 = T ? performance.now() : 0;
     for (let i = 0; i < n; i++) { if (fixed[i]) continue; vx[i] += 0.5 * dt * fx[i] / mass[i]; vy[i] += 0.5 * dt * fy[i] / mass[i]; }
     this.time += dt; this.steps++;
@@ -278,14 +292,14 @@ class Sim {
      1 = fast + energy ledger refresh, 2 (default) = everything incl. connected components (the original behaviour). */
   stats(level) {
     if (level === undefined) level = 2;
-    const { n, nPlate, x, y, vx, vy, mass } = this; const s = new Float64Array(32), T = this.timers, t0 = T ? performance.now() : 0;
-    let ke = 0, maxsp = 0;
-    for (let i = 0; i < n; i++) { const v2 = vx[i] * vx[i] + vy[i] * vy[i]; ke += 0.5 * mass[i] * v2; if (v2 > maxsp) maxsp = v2; }
+    const { n, nPlate, x, y, vx, vy, mass } = this; const s = new Float64Array(35), T = this.timers, t0 = T ? performance.now() : 0;
+    let ke = 0, maxsp = 0, momentumX = 0, momentumY = 0;
+    for (let i = 0; i < n; i++) { const v2 = vx[i] * vx[i] + vy[i] * vy[i]; ke += 0.5 * mass[i] * v2; momentumX += mass[i] * vx[i]; momentumY += mass[i] * vy[i]; if (v2 > maxsp) maxsp = v2; }
     maxsp = Math.sqrt(maxsp);
     const C = this._diag || (this._diag = { eel: 0, ect: 0, fc: 0, fp: 0, energyAtStep: -1, fragAtStep: -1, energyAtTime: 0, fragAtTime: 0 });
     if (level >= 1) { const t1 = T ? performance.now() : 0; const e = this._energyTerms(); C.eel = e.eel; C.ect = e.ect; C.energyAtStep = this.steps; C.energyAtTime = this.time; if (T) T.energy = (T.energy || 0) + performance.now() - t1; }
     if (level >= 2) { const t1 = T ? performance.now() : 0; const f = this._fragmentTerms(); C.fc = f.fc; C.fp = f.fp; C.fragAtStep = this.steps; C.fragAtTime = this.time; if (T) T.fragments = (T.fragments || 0) + performance.now() - t1; }
-    const eel = C.eel, ect = C.ect, total = ke + eel + this.ePl + this.eFr + ect;
+    const eel = C.eel, ect = C.ect, total = ke + eel + this.ePl + this.eFr + ect + this.eDamp;
     let sd = 0, md = 0;
     for (let i = 0; i < nPlate; i++) { const d = Math.hypot(x[i] - this.x0[i], y[i] - this.y0[i]); sd += d; if (d > md) md = d; }
     let pm = 0, pvx = 0, pvy = 0, behind = 0, minN = Infinity;
@@ -297,6 +311,7 @@ class Sim {
     let mpl = 0; for (let i = 0; i < nPlate; i++) mpl += mass[i];
     s.set([this.time, this.steps, n, this.h, this.dz, this.dt, ke, eel, this.ePl, this.eFr, ect, 0, total, this.ke0, total - this.ke0,
       this.ke0 > 0 ? (total - this.ke0) / this.ke0 : 0, this.bi.length, this.nBrokenCount, sd / nPlate, md, C.fc, C.fp, pvx / pm, pvy / pm, behind / pm, dmax, pm, mpl, maxsp, nPlate, n - nPlate, this.fired ? 1 : 0]);
+    s[32] = this.eDamp; s[33] = momentumX; s[34] = momentumY;
     if (T && level === 0) T.fast = (T.fast || 0) + performance.now() - t0;
     return s;
   }
@@ -314,7 +329,7 @@ class Sim {
     const f = (v) => { buf.setFloat64(0, v); return buf.getBigUint64(0); };
     for (let i = 0; i < this.n; i++) { mix(f(this.x[i])); mix(f(this.y[i])); mix(f(this.vx[i])); mix(f(this.vy[i])); mix(BigInt(this.mat[i])); }
     for (let b = 0; b < this.bi.length; b++) { mix(BigInt(this.bbroken[b])); mix(f(this.bl[b])); }
-    mix(f(this.ePl)); mix(f(this.eFr)); return h;
+    mix(f(this.ePl)); mix(f(this.eFr)); mix(f(this.eDamp)); return h;
   }
   particle(i) {
     return { id: i, mat: this.mat[i], fixed: !!this.fixed[i], x: this.x[i], y: this.y[i], vx: this.vx[i], vy: this.vy[i], mass: this.mass[i],
