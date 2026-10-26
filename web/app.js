@@ -3,6 +3,13 @@
 const R = window.ALResearch.load(window.ARMORLAB_RESEARCH_CSV);
 const P = window.ALResearch.integratePresets(window.ARMORLAB_PRESETS, R), SC = window.ALScenario, $ = (id) => document.getElementById(id);
 const st = { cfg: null, boundary: null, projectileProfile: null, running: false, started: false, done: false, wall: 0, cam: null, sel: -1, backend: 'JS', mode: 'inline', S: null, age: null, T_END: P.solver.end_time_s, userCam: false, n: 0, h: 0, dt: 0, nPlate: 0, pos: null, snapSim: 0, pending: null, host: null, buildId: 0, ready: false, calib: null, view: 0, pickIdx: new window.ALPick.PickIndex(), pickAt: -1e9, insp: null, dirty: true, rendMs: 0 };
+const MatLib = new window.ALMaterials.Library(window.ARMORLAB_MATERIALS, new Set(R.sources.keys()));
+let storage = null; try { storage = window.localStorage; storage.getItem('x'); } catch (e) { storage = null; }
+const DStore = new window.ALDesign.DesignStore(MatLib, window.ARMORLAB_DESIGNS, storage);
+const viewIsCutaway = () => $('view').value === '1';
+const DUI = window.ALDesignUI.init({ lib: MatLib, store: DStore, P, currentAmmo: () => $('ammo').value, viewMode: () => (viewIsCutaway() ? 'cutaway' : 'external'),
+  setAmmo: (id) => { $('cmp').checked = true; $('ammo').disabled = false; $('ammo').value = id; syncAmmo(); build(); },
+  onChange: () => { syncAmmo(); st.dirty = true; } });
 const fmt = (v, d) => (Math.abs(v) >= 1e4 || (v !== 0 && Math.abs(v) < 1e-2) ? v.toExponential(2) : v.toFixed(d == null ? 2 : d));
 // ---- UI population
 for (const [id, t] of Object.entries(P.targets)) $('target').add(new Option(t.name, id));
@@ -28,19 +35,11 @@ function syncAmmo() {
   const t = P.targets[$('target').value], cmp = $('cmp').checked;
   if (!cmp) $('ammo').value = t.pairing; $('ammo').disabled = !cmp;
   const a = P.ammunition[$('ammo').value];
-  const profile = SC.projectileGeometry(P, $('ammo').value), silhouette = SC.projectileSilhouette(profile);
-  const width = profile.lengthMm, height = profile.calibreMm, scale = Math.min(210 / width, 44 / height);
-  const points = silhouette.map(([x, y]) => `${(120 + x * scale).toFixed(2)},${(38 - y * scale).toFixed(2)}`).join(' ');
-  const shapeName = { rounded: 'rounded', pointed: 'pointed', ogive: 'ogive' }[profile.noseProfile];
-  const core = profile.core;
-  const coreSvg = core && core.geometry && core.geometry.diameter_mm && core.geometry.length_mm
-    ? `<text class="caption" x="120" y="62" text-anchor="middle">estimated solver core / carrier section</text>
-      <rect x="20" y="66" width="200" height="8" rx="2" fill="none" stroke="#e0a33e" stroke-width="1"/>
-      <rect class="core" x="${(220 - core.geometry.length_mm / profile.lengthMm * 200).toFixed(1)}" y="${(70 - Math.max(2, core.geometry.diameter_mm / profile.calibreMm * 8) / 2).toFixed(1)}" width="${Math.min(200, core.geometry.length_mm / profile.lengthMm * 200).toFixed(1)}" height="${Math.max(2, core.geometry.diameter_mm / profile.calibreMm * 8).toFixed(1)}"/>`
-    : `<text class="caption" x="120" y="72" text-anchor="middle">No source-backed internal dimensions; no cross-section shown</text>`;
-  $('projectilePreview').innerHTML = `<svg viewBox="0 0 240 78" role="img" aria-label="Configured projectile silhouette: ${htmlText(a.designation || a.name)}">
-    <polygon class="shape" points="${points}"/><text class="caption" x="120" y="57" text-anchor="middle">${profile.experimental ? 'PROVISIONAL TEST PROFILE' : 'APPROXIMATE SOLVER PROFILE'} · ${shapeName} nose · ${profile.bodyTaperFraction ? `taper ${(profile.bodyTaperFraction * 100).toFixed(0)}%` : 'cylindrical body'}</text>${coreSvg}</svg>
-    <div class="note">${profile.calibreMm} mm diameter × ${profile.lengthMm} mm simulation length. World dimensions are converted from mm to m; camera zoom changes display only. ${htmlText(profile.basis || '')}</div>`;
+  const profile = SC.projectileGeometry(P, $('ammo').value);
+  DUI.renderPreview($('ammo').value);
+  const envNote = document.createElement('div'); envNote.className = 'note';
+  envNote.textContent = `Solver envelope (unchanged): ${profile.calibreMm} mm diameter × ${profile.lengthMm} mm length, ${profile.noseProfile} nose, ${profile.bodyTaperFraction ? `taper ${(profile.bodyTaperFraction * 100).toFixed(0)}%` : 'cylindrical body'} (${profile.basis || 'see presets'}). Dashed outline in the viewport = this envelope; cell designs are visual and are not solver particles. World dimensions are mm→m; zoom changes display only.`;
+  $('projectilePreview').appendChild(envNote);
   const evidence = a.international_evidence, approximation = a.solver_approximation;
   const mass = a.projectile_mass_kg == null ? 'unknown' : `${a.projectile_mass_kg} kg`;
   const velocity = a.nominal_muzzle_velocity_mps == null ? 'unknown' : `${a.nominal_muzzle_velocity_mps} m/s`;
@@ -166,13 +165,16 @@ function draw() {
     for (let i = st.nPlate; i < st.n; i++) { cx += st.pos[2 * i]; cy += st.pos[2 * i + 1]; count++; }
     cx /= count; cy /= count;
     const points = SC.projectileSilhouette(st.projectileProfile, 48);
+    const dsg = DStore.designFor($('ammo').value), img = DUI.rasterCanvas(dsg, viewIsCutaway() ? 'cutaway' : 'external', 4), dw = dsg.cols * dsg.cellMm * 1e-3, dh = dsg.rows * dsg.cellMm * 1e-3;
+    shape2.imageSmoothingEnabled = false; shape2.drawImage(img, (cx - dw / 2 - cam.cx) * sc + W / 2, -(cy + dh / 2 - cam.cy) * sc + H / 2, dw * sc, dh * sc);
+    shape2.setLineDash([6 * r, 5 * r]);
     shape2.beginPath();
     for (let i = 0; i < points.length; i++) {
       const x = (points[i][0] + cx - cam.cx) * sc + W / 2;
       const y = -(points[i][1] + cy - cam.cy) * sc + H / 2;
       if (i === 0) shape2.moveTo(x, y); else shape2.lineTo(x, y);
     }
-    shape2.closePath(); shape2.lineWidth = 1.5 * r; shape2.strokeStyle = '#ffd27a'; shape2.stroke();
+    shape2.closePath(); shape2.lineWidth = 1.5 * r; shape2.strokeStyle = '#ffd27a'; shape2.stroke(); shape2.setLineDash([]);
   }
   g2.clearRect(0, 0, W, H); g2.lineWidth = 1;
   const wx = (px) => (px - W / 2) / sc + cam.cx, wy = (py) => -(py - H / 2) / sc + cam.cy, sx = (x) => (x - cam.cx) * sc + W / 2, sy = (y) => -(y - cam.cy) * sc + H / 2;
@@ -264,9 +266,10 @@ glC.addEventListener('pointerup', (e) => { if (drag && !drag.moved && st.pos) { 
 $('fire').onclick = () => { if (st.started || !st.ready) return; st.host.send({ t: 'fire' }); st.started = true; st.running = true; $('fire').disabled = true; $('pause').disabled = false; setState('running'); st.host.send({ t: 'play', rate: +$('speed').value, tEnd: st.T_END }); };
 $('pause').onclick = () => { if (st.done) return; st.running = !st.running; $('pause').textContent = st.running ? 'Pause' : 'Resume'; setState(st.running ? 'running' : 'paused'); st.host.send(st.running ? { t: 'play', rate: +$('speed').value, tEnd: st.T_END } : { t: 'pause' }); };
 $('speed').onchange = () => { if (st.running) st.host.send({ t: 'play', rate: +$('speed').value, tEnd: st.T_END }); };
-$('view').onchange = () => { st.host.send({ t: 'view', mode: +$('view').value }); st.dirty = true; };
+$('view').onchange = () => { DUI.renderPreview($('ammo').value); st.host.send({ t: 'view', mode: +$('view').value }); st.dirty = true; };
 $('reset').onclick = () => build();
 $('fit').onclick = () => fit();
+$('openCat').onclick = () => DUI.openCatalogue(); $('openEd').onclick = () => DUI.openEditor();
 $('calib').onclick = () => { if (st.running) return; $('tierNote').textContent = 'Calibrating (~1 s)…'; const c = SC.makeConfig(P, $('target').value, $('ammo').value, { n: 5000, velocity: +$('vel').value, support: $('support').value, supportStiffness: +$('supportK').value, supportDamping: +$('supportC').value }); st.host.send({ t: 'calibrate', cfg: c }); };
 // tier advice: ms/step is measured at ~5k particles; larger tiers are EXTRAPOLATED (cost/step ~ N, dt ~ 1/sqrt(N)) - labelled as estimates, never as measurements.
 function onCalibrated(m) {
@@ -284,11 +287,13 @@ $('target').onchange = () => { syncAmmo(); syncSupportControls(); build(); };
 $('ammo').onchange = () => { syncAmmo(); build(); };
 $('cmp').onchange = () => { syncAmmo(); build(); };
 window.addEventListener('resize', () => { resize(); if (!st.userCam && st.pos) fit(); st.dirty = true; });
+function solverPalette() { const f = (id, k) => MatLib.rgb(id)[k].map((v) => v / 255), ids = { 0: 'MAT_ARMOUR_STEEL_PLATE', 1: 'MAT_STEEL_ASSUMED', 3: 'MAT_TUNGSTEN_CARBIDE_CORE', 4: 'MAT_STEEL_FIXTURE' }, pal = { ext: {}, cut: {} };
+  for (const k of [0, 1, 3, 4]) { pal.ext[k] = f(ids[k], 'base'); pal.cut[k] = f(ids[k], 'fill'); } return pal; }
 // ---- boot
 let rend = null;
 (async function boot() {
   try {
-    syncAmmo(); resize(); rend = new window.ALRenderer(glC);
+    syncAmmo(); resize(); rend = new window.ALRenderer(glC); rend.setPalette(solverPalette());
     st.host = new window.ALHost(onMsg); const info = await st.host.start(window.ARMORLAB_WASM_B64, /[?&]inline=1/.test(location.search));
     st.mode = info.mode; st.backend = info.backend; st.engineNote = info.note; st.hostNote = info.hostNote;
     if (info.hostNote) console.warn('ArmorLab host:', info.hostNote); if (info.note) console.info('ArmorLab engine:', info.note);

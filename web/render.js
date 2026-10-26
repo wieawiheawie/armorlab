@@ -3,17 +3,15 @@
 (function (root) {
 'use strict';
 const VS = `attribute vec2 aPos; attribute float aMat; attribute float aDmg; attribute float aSpd;
-uniform vec2 uCenter; uniform vec2 uRes; uniform float uScale; uniform float uSize; uniform float uMode; uniform float uVmax;
+uniform vec2 uCenter; uniform vec2 uRes; uniform float uScale; uniform float uSize; uniform float uMode; uniform float uVmax; uniform vec3 uExt0; uniform vec3 uExt1; uniform vec3 uExt3; uniform vec3 uExt4; uniform vec3 uCut0; uniform vec3 uCut1; uniform vec3 uCut3; uniform vec3 uCut4;
 varying vec3 vCol; varying float vSolid;
 vec3 ramp(float t){ t=clamp(t,0.0,1.0); vec3 a=vec3(0.10,0.13,0.18), b=vec3(0.90,0.64,0.24), c=vec3(1.0,0.97,0.88); return t<0.5?mix(a,b,t*2.0):mix(b,c,(t-0.5)*2.0); }
 void main(){
   vec2 p=(aPos-uCenter)*uScale; gl_Position=vec4(p.x/uRes.x*2.0, p.y/uRes.y*2.0, 0.0, 1.0);
   float sz=max(uSize*uScale, 1.7); gl_PointSize=sz; vSolid = sz<3.2 ? 1.0 : 0.0;
-  vec3 plate=vec3(0.50,0.56,0.64), proj=vec3(0.90,0.64,0.24), clamp_=vec3(0.28,0.31,0.36);
-  vec3 core=vec3(0.62,0.43,0.78);
-  vec3 base = aMat>3.5 ? clamp_ : (aMat>2.5 ? core : (aMat>0.5 ? proj : plate));
+  vec3 base = aMat>3.5 ? uExt4 : (aMat>2.5 ? uExt3 : (aMat>0.5 ? uExt1 : uExt0));
   if(uMode<0.5){ vCol = base*(1.0-0.75*aDmg); }
-  else if(uMode<1.5){ vCol = aMat>3.5 ? vec3(0.45,0.38,0.62) : (aMat>2.5 ? core : (aMat>0.5 ? vec3(0.90,0.64,0.24) : vec3(0.30,0.62,0.75))); }
+  else if(uMode<1.5){ vCol = aMat>3.5 ? uCut4 : (aMat>2.5 ? uCut3 : (aMat>0.5 ? uCut1 : uCut0)); }
   else if(uMode<2.5){ vCol = ramp(aDmg); }
   else { vCol = ramp(aSpd/uVmax); }
 }`;
@@ -31,11 +29,13 @@ class Renderer {
     const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(pr);
     if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pr));
     this.pr = pr; this.loc = {}; ['aPos', 'aMat', 'aDmg', 'aSpd'].forEach(n => this.loc[n] = gl.getAttribLocation(pr, n));
-    this.u = {}; ['uCenter', 'uRes', 'uScale', 'uSize', 'uMode', 'uVmax'].forEach(n => this.u[n] = gl.getUniformLocation(pr, n));
+    this.u = {}; ['uCenter', 'uRes', 'uScale', 'uSize', 'uMode', 'uVmax', 'uExt0', 'uExt1', 'uExt3', 'uExt4', 'uCut0', 'uCut1', 'uCut3', 'uCut4'].forEach(n => this.u[n] = gl.getUniformLocation(pr, n));
     this.buf = { pos: gl.createBuffer(), mat: gl.createBuffer(), dmg: gl.createBuffer(), spd: gl.createBuffer() };
     this.n = 0; this.h = 0; this.stats = { posBytes: 0, dmgBytes: 0, spdBytes: 0, frames: 0 }; this.hasSpd = false;
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   }
+  /* colours come from the material library (appearance only; never a solver input). pal = { ext:{0,1,3,4:[r,g,b 0..1]}, cut:{...} } */
+  setPalette(pal) { this.pal = pal; }
   /* new model: allocate GPU storage once, upload static material + initial damage/pos */
   setModel(n, h, mat, pos, dmg) {
     const gl = this.gl; this.n = n; this.h = h; this.hasSpd = false;
@@ -54,7 +54,8 @@ class Renderer {
     bind(this.buf.pos, this.loc.aPos, 2); bind(this.buf.mat, this.loc.aMat, 1); bind(this.buf.dmg, this.loc.aDmg, 1); bind(this.buf.spd, this.loc.aSpd, 1);
     gl.uniform2f(this.u.uCenter, cam.cx, cam.cy); gl.uniform2f(this.u.uRes, w / 2, h / 2); gl.uniform1f(this.u.uScale, cam.scale);
     // disc diameter = 0.98 * lattice spacing: visible gaps at high zoom, no inflation of radii at low zoom beyond a 1.7 px floor
-    gl.uniform1f(this.u.uSize, this.h * 0.98); gl.uniform1f(this.u.uMode, mode); gl.uniform1f(this.u.uVmax, vmax);
+    gl.uniform1f(this.u.uSize, this.h * 0.98); if (this.pal) for (const k of [0, 1, 3, 4]) { gl.uniform3fv(this.u['uExt' + k], this.pal.ext[k]); gl.uniform3fv(this.u['uCut' + k], this.pal.cut[k]); }
+    gl.uniform1f(this.u.uMode, mode); gl.uniform1f(this.u.uVmax, vmax);
     gl.drawArrays(gl.POINTS, 0, this.n); this.stats.frames++;
   }
 }

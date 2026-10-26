@@ -1,0 +1,611 @@
+{
+ "schema": "armorlab-material-library-1",
+ "description": "Appearance, evidence and solver-link records for every material usable in ArmorLab projectile designs. Appearance blocks are display conventions and never feed the solver. 'solver_material_ref' only points at the existing preset records (presets/presets.json); no numeric solver values are duplicated here.",
+ "hatches": [
+  "none",
+  "diag",
+  "diag-rev",
+  "diag-sparse",
+  "cross",
+  "dots"
+ ],
+ "solver_class_map": {
+  "0": "MAT_ARMOUR_STEEL_PLATE",
+  "1": "projectile primary body (design-dependent)",
+  "3": "MAT_TUNGSTEN_CARBIDE_CORE",
+  "4": "MAT_STEEL_FIXTURE"
+ },
+ "materials": [
+  {
+   "id": "MAT_STEEL_HARDENED_AP",
+   "name": "Hardened AP steel (German APCBC body)",
+   "category": "ferrous",
+   "status": "documented_class",
+   "evidence": {
+    "source_ids": [
+     "S04",
+     "S05"
+    ],
+    "summary": "German APCBC bodies are described as hardened steel armour-piercing bodies (TM 9-1985-3 / OP 1666 per research pack). Exact grade and heat treatment are not documented."
+   },
+   "confidence": "B for material class; grade unknown",
+   "uncertainty": "Steel class only. The solver values are generic/tuning estimates, not data for this shell steel.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#6f7782",
+     "light": "#aab3bf",
+     "dark": "#383d45",
+     "roughness": 0.35,
+     "reflectivity": 0.55,
+     "finish": "dark blued/phosphated steel"
+    },
+    "cutaway": {
+     "fill": "#7e8996",
+     "hatch": "diag",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": "PROJECTILE_PROVISIONAL",
+    "solver_supported_properties": [
+     "density",
+     "youngs_modulus",
+     "yield_stress",
+     "hardening_ratio_H_over_E",
+     "critical_tensile_bond_strain"
+    ],
+    "not_simulated": [
+     "strain-rate sensitivity",
+     "thermal softening",
+     "fracture toughness / damage law beyond the generic critical bond strain",
+     "hardness-dependent behaviour",
+     "material anisotropy / grain structure"
+    ],
+    "unknown": [
+     "exact grade",
+     "heat treatment",
+     "lot-to-lot variation"
+    ]
+   },
+   "builtin_assignable": true,
+   "notes": ""
+  },
+  {
+   "id": "MAT_STEEL_ASSUMED",
+   "name": "Steel, assumed (unverified for this round)",
+   "category": "ferrous",
+   "status": "provisional",
+   "evidence": {
+    "source_ids": [],
+    "summary": "ArmorLab's solver runs the international rounds as a generic steel body. That is a test assumption, not evidence that the real round's body was this material."
+   },
+   "confidence": "provisional / assumed",
+   "uncertainty": "Material identity for the named round is unverified.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#76787c",
+     "light": "#a9acb1",
+     "dark": "#3d3f43",
+     "roughness": 0.45,
+     "reflectivity": 0.45,
+     "finish": "neutral dull steel"
+    },
+    "cutaway": {
+     "fill": "#8d9298",
+     "hatch": "diag-sparse",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": "PROJECTILE_PROVISIONAL",
+    "solver_supported_properties": [
+     "density",
+     "youngs_modulus",
+     "yield_stress",
+     "hardening_ratio_H_over_E",
+     "critical_tensile_bond_strain"
+    ],
+    "not_simulated": [
+     "strain-rate sensitivity",
+     "thermal softening",
+     "fracture toughness / damage law beyond the generic critical bond strain",
+     "hardness-dependent behaviour",
+     "material anisotropy / grain structure"
+    ],
+    "unknown": [
+     "exact grade",
+     "heat treatment",
+     "lot-to-lot variation"
+    ]
+   },
+   "builtin_assignable": true,
+   "notes": "Used only where the solver's generic steel body is the only supported material statement."
+  },
+  {
+   "id": "MAT_STEEL_CAP_PROVISIONAL",
+   "name": "Steel, AP cap (provisional)",
+   "category": "ferrous",
+   "status": "provisional",
+   "evidence": {
+    "source_ids": [
+     "S04"
+    ],
+    "summary": "An armour-piercing cap is documented for APCBC / APC-T rounds. Its material and dimensions were not found; steel is the conventional assumption only."
+   },
+   "confidence": "C: existence documented, material not",
+   "uncertainty": "Material and geometry unknown; not simulated as a separate body.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#5c626b",
+     "light": "#979faa",
+     "dark": "#2f3338",
+     "roughness": 0.3,
+     "reflectivity": 0.6,
+     "finish": "dark hardened cap"
+    },
+    "cutaway": {
+     "fill": "#5f7490",
+     "hatch": "cross",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "material",
+     "hardness",
+     "dimensions",
+     "mass split"
+    ]
+   },
+   "builtin_assignable": true,
+   "notes": ""
+  },
+  {
+   "id": "MAT_STEEL_WINDSCREEN_PROVISIONAL",
+   "name": "Sheet steel, windscreen / ballistic cap (provisional)",
+   "category": "ferrous",
+   "status": "provisional",
+   "evidence": {
+    "source_ids": [
+     "S04"
+    ],
+    "summary": "A ballistic wind cap is documented as distinct from the AP cap. Thickness, material and attachment were not found."
+   },
+   "confidence": "C: existence documented, material not",
+   "uncertainty": "Not simulated; no dimensions available.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#8c9298",
+     "light": "#c3c8ce",
+     "dark": "#4d5257",
+     "roughness": 0.5,
+     "reflectivity": 0.4,
+     "finish": "lighter stamped sheet"
+    },
+    "cutaway": {
+     "fill": "#a7b0ba",
+     "hatch": "dots",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "material",
+     "thickness",
+     "attachment method"
+    ]
+   },
+   "builtin_assignable": true,
+   "notes": ""
+  },
+  {
+   "id": "MAT_TUNGSTEN_CARBIDE_CORE",
+   "name": "Tungsten carbide core (generic estimate)",
+   "category": "tungsten",
+   "status": "documented_class",
+   "evidence": {
+    "source_ids": [
+     "S04",
+     "S31"
+    ],
+    "summary": "Pzgr.40-type rounds are documented as having a tungsten-carbide core in a lighter body. ArmorLab's solver uses generic WC estimates, not variant-specific measurements."
+   },
+   "confidence": "B for core material class; C for dimensions",
+   "uncertainty": "Core dimensions and exact composition for Pzgr.40/43 are unverified.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#474a55",
+     "light": "#8c91a3",
+     "dark": "#202228",
+     "roughness": 0.25,
+     "reflectivity": 0.65,
+     "finish": "dense dark carbide"
+    },
+    "cutaway": {
+     "fill": "#7b6199",
+     "hatch": "cross",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": "ammunition:TIGER2_PZGR4043:core_material",
+    "solver_supported_properties": [
+     "density",
+     "youngs_modulus",
+     "yield_stress",
+     "hardening_ratio_h_over_e",
+     "critical_tensile_bond_strain"
+    ],
+    "not_simulated": [
+     "strain-rate sensitivity",
+     "thermal softening",
+     "fracture toughness / damage law beyond the generic critical bond strain",
+     "hardness-dependent behaviour",
+     "material anisotropy / grain structure"
+    ],
+    "unknown": [
+     "binder content",
+     "grain size",
+     "exact dimensions",
+     "manufacturer batch"
+    ]
+   },
+   "builtin_assignable": true,
+   "notes": ""
+  },
+  {
+   "id": "MAT_UNVERIFIED_PRIMARY",
+   "name": "Unverified material A (identity unknown)",
+   "category": "unknown",
+   "status": "unverified",
+   "evidence": {
+    "source_ids": [],
+    "summary": "Placeholder for a component whose material is not established by the available evidence."
+   },
+   "confidence": "unknown",
+   "uncertainty": "Do not read any material identity from this colour.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#6b6e72",
+     "light": "#a0a3a7",
+     "dark": "#393b3e",
+     "roughness": 0.55,
+     "reflectivity": 0.35,
+     "finish": "neutral grey placeholder"
+    },
+    "cutaway": {
+     "fill": "#9a9a96",
+     "hatch": "dots",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "everything"
+    ]
+   },
+   "builtin_assignable": true,
+   "notes": ""
+  },
+  {
+   "id": "MAT_UNVERIFIED_SECONDARY",
+   "name": "Unverified material B (identity unknown)",
+   "category": "unknown",
+   "status": "unverified",
+   "evidence": {
+    "source_ids": [],
+    "summary": "Second placeholder, used to separate a different unverified component (e.g. driving band, sabot or tail) from material A in the display only."
+   },
+   "confidence": "unknown",
+   "uncertainty": "Separation by colour does not imply the two materials differ.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#837f79",
+     "light": "#b5b0a8",
+     "dark": "#46433f",
+     "roughness": 0.6,
+     "reflectivity": 0.3,
+     "finish": "neutral warm-grey placeholder"
+    },
+    "cutaway": {
+     "fill": "#b2a88f",
+     "hatch": "diag-rev",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "everything"
+    ]
+   },
+   "builtin_assignable": true,
+   "notes": ""
+  },
+  {
+   "id": "MAT_ARMOUR_STEEL_PLATE",
+   "name": "Armour plate steel (provisional)",
+   "category": "ferrous",
+   "status": "provisional",
+   "evidence": {
+    "source_ids": [
+     "S03",
+     "S18"
+    ],
+    "summary": "Target plate material class is rolled armour steel; grade, lot and heat treatment are unknown in the data pack."
+   },
+   "confidence": "B for class; grade unknown",
+   "uncertainty": "Solver values are generic/tuning estimates.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#68707a",
+     "light": "#a2abb6",
+     "dark": "#353a41",
+     "roughness": 0.5,
+     "reflectivity": 0.4,
+     "finish": "rolled plate"
+    },
+    "cutaway": {
+     "fill": "#5f8da3",
+     "hatch": "diag",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": "PLATE_PROVISIONAL",
+    "solver_supported_properties": [
+     "density",
+     "youngs_modulus",
+     "yield_stress",
+     "hardening_ratio_H_over_E",
+     "critical_tensile_bond_strain"
+    ],
+    "not_simulated": [
+     "strain-rate sensitivity",
+     "thermal softening",
+     "fracture toughness / damage law beyond the generic critical bond strain",
+     "hardness-dependent behaviour",
+     "material anisotropy / grain structure"
+    ],
+    "unknown": [
+     "exact grade",
+     "heat treatment",
+     "lot-to-lot variation"
+    ]
+   },
+   "builtin_assignable": false,
+   "notes": ""
+  },
+  {
+   "id": "MAT_STEEL_FIXTURE",
+   "name": "Fixture / clamped region",
+   "category": "ferrous",
+   "status": "provisional",
+   "evidence": {
+    "source_ids": [],
+    "summary": "Display class for solver particles in the rigid-fixture support region. Not a physical component of any historical target."
+   },
+   "confidence": "n/a",
+   "uncertainty": "A solver boundary-condition region, not a material.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#43464c",
+     "light": "#7d8189",
+     "dark": "#202226",
+     "roughness": 0.6,
+     "reflectivity": 0.3,
+     "finish": "boundary region"
+    },
+    "cutaway": {
+     "fill": "#6f6290",
+     "hatch": "none",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "not a physical material"
+    ]
+   },
+   "builtin_assignable": false,
+   "notes": ""
+  },
+  {
+   "id": "MAT_COPPER_ALLOY_REF",
+   "name": "Copper alloy (generic reference)",
+   "category": "copper",
+   "status": "reference_only",
+   "evidence": {
+    "source_ids": [],
+    "summary": "Generic reference entry so custom designs can paint a copper-alloy region. NOT verified for any built-in ArmorLab projectile; no built-in design uses it."
+   },
+   "confidence": "reference only",
+   "uncertainty": "No evidence ties it to any catalogue round.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#9d6a4f",
+     "light": "#d29a77",
+     "dark": "#55352a",
+     "roughness": 0.35,
+     "reflectivity": 0.7,
+     "finish": "copper-alloy sheen"
+    },
+    "cutaway": {
+     "fill": "#c07d55",
+     "hatch": "diag",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "alloy",
+     "component use"
+    ]
+   },
+   "builtin_assignable": false,
+   "notes": ""
+  },
+  {
+   "id": "MAT_ALUMINIUM_ALLOY_REF",
+   "name": "Aluminium alloy (generic reference)",
+   "category": "aluminium",
+   "status": "reference_only",
+   "evidence": {
+    "source_ids": [],
+    "summary": "Generic reference entry for custom designs. NOT verified for any built-in projectile (e.g. no sabot material is documented for the Type 73 APDS record)."
+   },
+   "confidence": "reference only",
+   "uncertainty": "No evidence ties it to any catalogue round.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#a7acb2",
+     "light": "#dde1e5",
+     "dark": "#5d6165",
+     "roughness": 0.55,
+     "reflectivity": 0.5,
+     "finish": "satin light alloy"
+    },
+    "cutaway": {
+     "fill": "#b9c8d8",
+     "hatch": "dots",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "alloy",
+     "component use"
+    ]
+   },
+   "builtin_assignable": false,
+   "notes": ""
+  },
+  {
+   "id": "MAT_TUNGSTEN_HEAVY_ALLOY_REF",
+   "name": "Tungsten heavy alloy (generic reference)",
+   "category": "tungsten",
+   "status": "reference_only",
+   "evidence": {
+    "source_ids": [],
+    "summary": "Generic reference entry for custom designs. NOT documented for any catalogue round."
+   },
+   "confidence": "reference only",
+   "uncertainty": "No evidence ties it to any catalogue round.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#55575c",
+     "light": "#999ca3",
+     "dark": "#26272a",
+     "roughness": 0.3,
+     "reflectivity": 0.55,
+     "finish": "dense dark alloy"
+    },
+    "cutaway": {
+     "fill": "#6a5a86",
+     "hatch": "cross",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "composition",
+     "component use"
+    ]
+   },
+   "builtin_assignable": false,
+   "notes": ""
+  },
+  {
+   "id": "MAT_FERROUS_SOFT_IRON_REF",
+   "name": "Soft iron / mild ferrous (generic reference)",
+   "category": "ferrous",
+   "status": "reference_only",
+   "evidence": {
+    "source_ids": [],
+    "summary": "Generic reference entry for custom designs (e.g. a soft-iron band). NOT verified for any built-in projectile."
+   },
+   "confidence": "reference only",
+   "uncertainty": "No evidence ties it to any catalogue round.",
+   "appearance": {
+    "note": "Appearance only. Changing any value here never changes solver behaviour.",
+    "external": {
+     "base": "#6f6b66",
+     "light": "#a29d96",
+     "dark": "#3a3734",
+     "roughness": 0.65,
+     "reflectivity": 0.3,
+     "finish": "dull iron"
+    },
+    "cutaway": {
+     "fill": "#8f8a82",
+     "hatch": "diag-rev",
+     "note": "Cutaway colour is a legend convention, not the material's natural colour."
+    }
+   },
+   "physical": {
+    "solver_material_ref": null,
+    "solver_supported_properties": [],
+    "not_simulated": [
+     "no solver link: every physical property of this material is unknown or not simulated"
+    ],
+    "unknown": [
+     "grade",
+     "component use"
+    ]
+   },
+   "builtin_assignable": false,
+   "notes": ""
+  }
+ ]
+}

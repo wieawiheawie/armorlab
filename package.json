@@ -6,11 +6,13 @@
     "build": "node scripts/build.js",
     "build:release": "node scripts/build.js --require-wasm",
     "build:js": "node scripts/build.js --js-only",
-    "test": "node --test tests/physics.test.js tests/optimization.test.js tests/research.test.js tests/armor_validation.test.js",
+    "test": "node --test tests/physics.test.js tests/optimization.test.js tests/research.test.js tests/armor_validation.test.js tests/design.test.js",
     "test:rust": "cargo test --release",
     "smoke": "node scripts/smoke_worker.js",
     "report": "node scripts/report.js",
     "bench": "node scripts/bench.js",
-    "bench:quick": "node scripts/bench.js --quick"
+    "bench:quick": "node scripts/bench.js --quick",
+    "designs": "node scripts/gen_designs.js",
+    "verify:zip": "node scripts/verify_zip.js"
   }
 }

@@ -11,7 +11,7 @@
 <h4>Ammunition</h4>
 <label><input type="checkbox" id="cmp"> Comparison mode (any round on any plate)</label>
 <select id="ammo"></select>
-<h4>Projectile preview</h4><div id="projectilePreview" class="projectile-preview"></div><div class="note" id="ammoInfo"></div>
+<h4>Projectile preview</h4><div id="projectilePreview" class="projectile-preview"></div><div class="row"><button id="openCat">Catalogue</button><button id="openEd">Cell editor</button></div><div class="note" id="ammoInfo"></div>
 <label>Initial simulation speed (m/s) <span class="note">idealised input; no flight/drag</span></label>
 <input type="number" id="vel" min="50" max="1500" step="1">
 <h4>Run</h4>
@@ -46,7 +46,7 @@
 <h4>Status / warnings</h4><div id="warn" class="note"></div>
 </aside>
 </main></div>
-<script>window.ARMORLAB_PRESETS=/*__PRESETS__*/;window.ARMORLAB_RESEARCH_CSV=/*__RESEARCH_CSV__*/;window.ARMORLAB_BOUNDARY_CSV=/*__BOUNDARY_CSV__*/;window.ARMORLAB_WASM_B64=/*__WASM__*/;window.ARMORLAB_BUILD="/*__BUILD__*/";</script>
+<script>window.ARMORLAB_PRESETS=/*__PRESETS__*/;window.ARMORLAB_RESEARCH_CSV=/*__RESEARCH_CSV__*/;window.ARMORLAB_BOUNDARY_CSV=/*__BOUNDARY_CSV__*/;window.ARMORLAB_WASM_B64=/*__WASM__*/;window.ARMORLAB_BUILD="/*__BUILD__*/";window.ARMORLAB_MATERIALS=/*__MATERIALS__*/;window.ARMORLAB_DESIGNS=/*__DESIGNS__*/;</script>
 <script>window.addEventListener('error',function(e){var el=document.getElementById('err');if(el){el.style.display='flex';el.textContent='Application script failed: '+(e.message||'JavaScript error');}});</script>
 <script type="text/plain" id="al-worker-src">/*__WORKER_SRC__*/</script>
 <script>/*__ENGINE_JS__*/</script>
@@ -57,6 +57,9 @@
 <script>/*__RUNNER__*/</script>
 <script>/*__PICK__*/</script>
 <script>/*__HOST__*/</script>
+<script>/*__MATERIALS_JS__*/</script>
+<script>/*__DESIGN__*/</script>
+<script>/*__DESIGN_UI__*/</script>
 <script>/*__RENDER__*/</script>
 <script>/*__APP__*/</script>
 </body></html>
