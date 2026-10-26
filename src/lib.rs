@@ -1,5 +1,6 @@
 //! WASM C-ABI wrapper (no wasm-bindgen; zero dependencies). Single global simulation instance.
 pub mod presets;
+pub mod boundary;
 pub mod sim;
 use sim::*;
 
@@ -10,6 +11,8 @@ static mut CFG: [f64; CFG_LEN] = [0.0; CFG_LEN];
 #[allow(static_mut_refs)]
 fn sim() -> &'static mut Sim { unsafe { &mut *SIM } }
 
+#[no_mangle] pub extern "C" fn al_cfg_len() -> u32 { CFG_LEN as u32 }
+#[no_mangle] pub extern "C" fn al_stat_len() -> u32 { STAT_LEN as u32 }
 /// pointer to a CFG_LEN f64 buffer JS fills before calling al_build
 #[no_mangle] pub extern "C" fn al_cfg_ptr() -> *mut f64 { unsafe { std::ptr::addr_of_mut!(CFG) as *mut f64 } }
 

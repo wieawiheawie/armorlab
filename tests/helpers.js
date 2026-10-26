@@ -1,7 +1,10 @@
 const path = require('path'), root = path.join(__dirname, '..');
 exports.E = require(path.join(root, 'web/engine_js.js'));
 exports.S = require(path.join(root, 'web/scenario.js'));
-exports.P = require(path.join(root, 'presets/presets.json'));
+const Research = require(path.join(root, 'web/research.js'));
+const manifest = require(path.join(root, 'research/ArmorLab_Research_Pack/manifest.json'));
+const csv = Object.fromEntries(manifest.csv_files.map((name) => [name, require('fs').readFileSync(path.join(root, 'research/ArmorLab_Research_Pack/data', name), 'utf8')]));
+exports.P = Research.integratePresets(require(path.join(root, 'presets/presets.json')), Research.load(csv));
 exports.root = root;
 exports.mk = (t, a, n, o) => { const s = new exports.E.Sim(exports.S.makeConfig(exports.P, t, a, Object.assign({ n }, o))); return s; };
-exports.T1 = 'TIGER1_UPPER_FRONT'; exports.T2 = 'TIGER2_UPPER_GLACIS'; exports.A1 = 'TIGER1_PZGR39'; exports.A2 = 'TIGER2_PZGR3943';
+exports.T1 = 'TIGER1_UPPER_FRONT'; exports.T2 = 'TIGER2_UPPER_GLACIS'; exports.A1 = 'TIGER1_PZGR39'; exports.A2 = 'TIGER2_PZGR3943'; exports.A3 = 'TIGER2_PZGR4043';

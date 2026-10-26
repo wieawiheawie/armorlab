@@ -1,5 +1,5 @@
 const test = require('node:test'), assert = require('node:assert/strict'), fs = require('fs'), path = require('path');
-const { E, S, P, root, mk, T1, T2, A1, A2 } = require('./helpers');
+const { E, S, P, root, mk, T1, T2, A1, A2, A3 } = require('./helpers');
 const near = (a, b, tol, m) => assert.ok(Math.abs(a - b) <= tol, `${m || ''} got ${a}, want ${b} ±${tol}`);
 function isolatedImpact(dtf = 0.25) {
   const q = mk(T1, A1, 3000, { dtf }); q.bbroken.fill(1); q.fixed.fill(1);
@@ -44,9 +44,12 @@ test('PROJ-01/02/PAIR-01 historical pairings, projectile masses, nominal muzzle 
   assert.ok(S.isHistorical(P, T1, A1) && S.isHistorical(P, T2, A2) && !S.isHistorical(P, T1, A2) && !S.isHistorical(P, T2, A1));
   for (const [t, a] of [[T1, A1], [T2, A2]]) { const s = mk(t, a, 4000); let m = 0; for (let i = s.nPlate; i < s.n; i++) m += s.mass[i]; near(m, P.ammunition[a].projectile_mass_kg, 1e-9, 'projectile mass'); }
 });
-test('PROJ-03 muzzle speed is labelled idealised impact speed in UI and docs (no flight/drag modelled)', () => {
-  const html = fs.readFileSync(path.join(root, 'web/index.template.html'), 'utf8'); assert.match(html, /idealised: muzzle speed used as impact speed/);
+test('PROJ-03 initial speed is labelled idealised with no flight or drag modelled', () => {
+  const html = fs.readFileSync(path.join(root, 'web/index.template.html'), 'utf8'); assert.match(html, /idealised input; no flight\/drag/);
   const rs = fs.readFileSync(path.join(root, 'src/presets.rs'), 'utf8'); assert.match(rs, /773\.0/); assert.match(rs, /1000\.0/); assert.match(rs, /10\.16/);
+  assert.equal(P.ammunition[A1].assumed_impact_velocity_mps, null);
+  assert.equal(S.makeConfig(P, T1, A1, { n: 3000 })[8], P.ammunition[A1].nominal_muzzle_velocity_mps);
+  assert.equal(S.makeConfig(P, T1, A1, { n: 3000, impactVelocity: 245 })[8], 245);
 });
 test('PROJ-04 distinct ammunition variants preserve their own solver inputs', () => {
   const a = S.makeConfig(P, T1, A1, { n: 3000, velocity: 773 });
@@ -54,16 +57,63 @@ test('PROJ-04 distinct ammunition variants preserve their own solver inputs', ()
   assert.notEqual(a[7], b[7]);
   assert.notEqual(a[8], b[8]);
   assert.equal(a[16], b[16]);
-  assert.notEqual(a[17], b[17]);
-  assert.notEqual(a[18], b[18]);
-  assert.notEqual(a[19], b[19]);
-  assert.notEqual(a[20], b[20]);
+  // Pzgr.39 and Pzgr.39/43 share one body material estimate (evidence: same body, wider driving band only); they differ in mass, speed and gun.
+  for (const k of [17, 18, 19, 20]) assert.equal(a[k], b[k], 'shared body estimate slot ' + k);
   assert.equal(a[16], 7850); assert.equal(b[16], 7850);
-  assert.equal(a[17], 200e9); assert.equal(b[17], 210e9);
-  assert.equal(a[18], 1800e6); assert.equal(b[18], 2100e6);
-  assert.equal(a[19], 0.02); assert.equal(b[19], 0.018);
-  assert.equal(a[20], 0.04); assert.equal(b[20], 0.035);
+  assert.equal(a[17], 200e9); assert.equal(a[18], 1800e6); assert.equal(a[19], 0.02); assert.equal(a[20], 0.04);
+  const c = S.makeConfig(P, T2, A3, { n: 3000 });
+  assert.equal(a[24], 0); assert.equal(b[24], 0); assert.equal(c[24], 1);
+  assert.notEqual(c[7], a[7]); assert.notEqual(c[8], b[8]); assert.notEqual(c[27], c[16]);
   assert.equal(a[7], P.ammunition[A1].projectile_mass_kg); assert.equal(b[7], P.ammunition[A2].projectile_mass_kg);
+});
+test('PROJ-05 selectable inventory resolves the three data-driven round models', () => {
+  assert.deepEqual(Object.keys(P.ammunition).filter((id) => P.ammunition[id].simulation_status === 'kinetic_approximation'), [A1, A2, A3]);
+  const apcr = P.ammunition[A3];
+  assert.equal(apcr.gun, '8.8 cm KwK 43 L/71 (Tiger II)');
+  assert.deepEqual(apcr.compatible_gun_ids, ['DE_88_KWK43_L71']);
+  assert.equal(apcr.family, 'APCR (tungsten-carbide core)');
+  assert.equal(apcr.research_id, 'DE_88_KWK43_PZGR40_43');
+  assert.equal(apcr.projectile_mass_kg, 7.3); assert.equal(apcr.nominal_muzzle_velocity_mps, 1130);
+  assert.equal(apcr.projectile_components.filter((part) => part.simulated).length, 2);
+  assert.equal(apcr.projectile_components.find((part) => part.id === 'wc_core').geometry.diameter_mm, 45);
+  const cfg = S.makeConfig(P, T2, A3, { n: 3000 });
+  assert.ok(S.isHistorical(P, T2, A3), 'APCR selection is compatible with the Tiger II gun, though not the default round');
+  assert.equal(cfg.length, 40); assert.equal(cfg[7], 7.3); assert.equal(cfg[8], 1130);
+  assert.equal(cfg[24], 1); assert.equal(cfg[25], 0.045); assert.equal(cfg[26], 0.16);
+  assert.equal(cfg[27], apcr.core_material.density_kg_m3); assert.equal(cfg[32], apcr.interface_material.youngs_modulus_pa);
+  const s = new E.Sim(cfg);
+  assert.equal(s.projectileComponentMode, 1);
+  assert.ok(s.mat.slice(s.nPlate).includes(2), 'core particles are part of the initialized projectile');
+  assert.ok(s.mat.slice(s.nPlate).includes(1), 'carrier particles are part of the initialized projectile');
+  assert.ok(s.bm.includes(3), 'cohesive core/carrier bonds are built into the solver');
+  const masses = [0, 0, 0]; for (let i = s.nPlate; i < s.n; i++) masses[s.mat[i]] += s.mass[i];
+  near(masses[1] + masses[2], apcr.projectile_mass_kg, 1e-9);
+  assert.ok(masses[1] > 0 && masses[2] > 0);
+  s.fire();
+  let momentum = 0, kineticEnergy = 0;
+  for (let i = s.nPlate; i < s.n; i++) { momentum += s.mass[i] * s.vx[i]; kineticEnergy += 0.5 * s.mass[i] * s.vx[i] ** 2; }
+  near(momentum, apcr.projectile_mass_kg * cfg[8], 1e-8, 'initial projectile momentum');
+  near(kineticEnergy, 0.5 * apcr.projectile_mass_kg * cfg[8] ** 2, 1e-7, 'initial projectile kinetic energy');
+  near(s.ke0, kineticEnergy, 1e-7, 'solver impact energy initialization');
+});
+test('PROJ-06 APCR interface stiffness, damage and component separation alter solver state', () => {
+  const cfg = S.makeConfig(P, T2, A3, { n: 3000 });
+  const doubled = cfg.slice(); doubled[32] *= 2;
+  const soft = new E.Sim(cfg), stiff = new E.Sim(doubled);
+  const bond = soft.bm.findIndex((m) => m === 3);
+  assert.ok(bond >= 0); assert.equal(stiff.bm[bond], 3);
+  near(stiff.bk[bond] / soft.bk[bond], 2, 1e-12, 'interface modulus changes cohesive spring stiffness');
+  const i = soft.bi[bond], j = soft.bj[bond], l0 = soft.bl0[bond];
+  for (const sim of [soft, stiff]) {
+    sim.bbroken.fill(1); sim.bbroken[bond] = 0; sim.fixed.fill(1); sim.fixed[i] = sim.fixed[j] = 0;
+    sim.x[i] = 10; sim.y[i] = 10; sim.x[j] = 10 + 1.01 * l0; sim.y[j] = 10;
+    sim.mats[3].rate = 0; sim.mats[3].ey = 10; sim.mats[3].ec = 10; sim.crush = -10; sim.computeForces();
+  }
+  near(stiff.fx[i] / soft.fx[i], 2, 1e-8, 'interface changes force response');
+  soft.mats[3].ec = 0.02;
+  soft.x[j] = 10 + 1.03 * l0; soft.computeForces();
+  assert.equal(soft.bbroken[bond], 1, 'interface fracture removes the cohesive connection');
+  assert.ok(soft.rDmg[i] > 0 || soft.rDmg[j] > 0, 'interface failure updates component damage');
 });
 test('RESET-01 rebuild reproduces the complete initial state bit-for-bit; run changes it', () => {
   const a = mk(T1, A1, 2500).hash(), s = mk(T1, A1, 2500); assert.equal(s.hash(), a); s.fire(); s.run(300); assert.notEqual(s.hash(), a); assert.equal(mk(T1, A1, 2500).hash(), a);
@@ -170,13 +220,14 @@ test('NUM-10 legacy rest update remains selectable without changing its preset p
   const plastic = singleBond(); plastic.q.mats[1].ec = 2;
   plastic.q.x[plastic.c] = 10 + 1.05 * plastic.rest; plastic.q.computeForces();
   const oldStretch = 0.05 * plastic.rest, yieldStretch = 0.01 * plastic.rest;
-  const expectedPlasticDrop = 0.5 * plastic.q.bk[plastic.b] * (oldStretch ** 2 - yieldStretch ** 2);
-  near(plastic.q.ePl, expectedPlasticDrop, 1e-10 * expectedPlasticDrop, 'plastic rest-update potential drop');
+  const overshoot = oldStretch - yieldStretch, kb = plastic.q.bk[plastic.b];
+  const expectedPlasticDrop = kb * yieldStretch * overshoot; // work of the capped force over the plastic extension
+  near(plastic.q.ePl, expectedPlasticDrop, 1e-10 * expectedPlasticDrop, 'plastic work of capped force');
   const pstats = plastic.q.stats(1);
-  near(pstats[7] + pstats[8], 0.5 * plastic.q.bk[plastic.b] * oldStretch ** 2, 1e-10 * expectedPlasticDrop, 'recoverable plus rest-update energy');
+  near(pstats[7] + pstats[8], 0.5 * kb * oldStretch ** 2 - 0.5 * kb * overshoot ** 2, 1e-10 * expectedPlasticDrop, 'recoverable plus dissipation = trial energy minus undelivered overshoot energy');
   const fracture = singleBond(); fracture.q.mats[1].ec = 0.05;
   fracture.q.x[fracture.c] = 10 + 1.2 * fracture.rest; fracture.q.computeForces();
-  const expectedFractureEnergy = 0.5 * fracture.q.bk[fracture.b] * (0.2 * fracture.rest) ** 2;
+  const expectedFractureEnergy = 0.5 * fracture.q.bk[fracture.b] * (0.01 * fracture.rest) ** 2; // projected onto the yield surface before deletion
   near(fracture.q.eFr, expectedFractureEnergy, 1e-10 * expectedFractureEnergy, 'energy assigned at bond deletion');
   assert.equal(fracture.q.bbroken[fracture.b], 1);
   near(fracture.q.stats(1)[7], 0, 1e-12, 'deleted bond no longer recoverable');
@@ -199,9 +250,9 @@ test('PL-01 isotropic return map: elastic loading, first yield, unloading and re
   near(alpha, gamma, 1e-12, 'first plastic increment');
   near((q.bl[b] - l0) / l0, gamma, 1e-12, 'signed plastic strain');
   near((q.x[j] - q.x[i] - q.bl[b]) / l0, 0.01 + 0.2 * gamma, 1e-12, 'return to yield surface');
-  near(q.ePl, q.bk[b] * l0 ** 2 * (0.01 * gamma + 0.5 * 1.2 * gamma ** 2), 1e-9, 'nonnegative return-map dissipation');
+  near(q.ePl, q.bk[b] * l0 ** 2 * (0.01 * gamma + 0.5 * 0.2 * gamma ** 2), 1e-9, 'return-map dissipation = work of the capped force');
   assert.ok(q.ePl >= 0, 'dissipation nonnegative');
-  near(q.stats(1)[7] + hStored + q.ePl, preYieldEnergy, 1e-9, 'first-yield energy balance');
+  near(q.stats(1)[7] + hStored + q.ePl, preYieldEnergy - 0.5 * q.bk[b] * l0 ** 2 * gamma ** 2, 1e-9, 'first-yield balance: trial energy minus undelivered overshoot energy');
   const stateAtYield = { rest: q.bl[b], alpha: q.bep[b], diss: q.ePl };
   setStrain(0);
   near(q.bl[b], stateAtYield.rest, 1e-14, 'unloading preserves plastic rest extension');
@@ -295,11 +346,39 @@ test('Support-condition comparison: clamped vs free coupon both run and differ (
 test('Rust/JS preset consistency (src/presets.rs vs presets.json)', () => {
   const rs = fs.readFileSync(path.join(root, 'src/presets.rs'), 'utf8');
   for (const [id, t] of Object.entries(P.targets)) assert.ok(new RegExp(`id: "${id}", t_mm: ${t.nominal_thickness_mm.toFixed(1)}, slope_deg: ${t.slope_from_vertical_deg.toFixed(1)}, face_mm: ${t.coupon_face_length_mm.toFixed(1)}, pairing: "${t.pairing}"`).test(rs), id);
-  for (const [id, a] of Object.entries(P.ammunition)) assert.ok(new RegExp(`id: "${id}".*mass_kg: ${a.projectile_mass_kg}, muzzle_mps: ${a.nominal_muzzle_velocity_mps.toFixed(1)}`).test(rs), id);
+  for (const [id, a] of Object.entries(P.ammunition).filter(([, ammo]) => ammo.simulation_status === 'kinetic_approximation')) {
+    const line = rs.split('\n').find((entry) => entry.includes(`id: "${id}"`));
+    assert.ok(line, id);
+    const field = (name) => { const match = line.match(new RegExp(`${name}: ([^,}]+)`)); assert.ok(match, `${id}.${name}`); return Number(match[1]); };
+    for (const [name, value] of [
+      ['mass_kg', a.projectile_mass_kg], ['muzzle_mps', a.nominal_muzzle_velocity_mps], ['proj_rho', a.projectile_density_kg_m3],
+      ['proj_e', a.projectile_youngs_modulus_pa], ['proj_sy', a.projectile_yield_stress_pa], ['proj_hr', a.projectile_hardening_ratio_h_over_e],
+      ['proj_ec', a.projectile_critical_tensile_bond_strain], ['calibre_mm', a.calibre_mm], ['length_mm', a.length_mm], ['nose_mm', a.nose_length_mm]
+    ]) assert.equal(field(name), value, `${id}.${name}`);
+    const core = a.projectile_components.find((part) => part.id === 'wc_core');
+    if (core) {
+      assert.equal(field('core_diameter_mm'), core.geometry.diameter_mm);
+      assert.equal(field('core_length_mm'), core.geometry.length_mm);
+      assert.equal(field('core_rho'), a.core_material.density_kg_m3);
+      assert.equal(field('core_e'), a.core_material.youngs_modulus_pa);
+      assert.equal(field('core_sy'), a.core_material.yield_stress_pa);
+      assert.equal(field('core_hr'), a.core_material.hardening_ratio_h_over_e);
+      assert.equal(field('core_ec'), a.core_material.critical_tensile_bond_strain);
+      assert.equal(field('interface_e'), a.interface_material.youngs_modulus_pa);
+      assert.equal(field('interface_sy'), a.interface_material.yield_stress_pa);
+      assert.equal(field('interface_hr'), a.interface_material.hardening_ratio_h_over_e);
+      assert.equal(field('interface_ec'), a.interface_material.critical_tensile_bond_strain);
+    }
+  }
 });
-test('BUILD-01 generated HTML embeds all assets; WASM presence reported honestly', (t) => {
+test('BUILD-01 generated HTML embeds all ammunition assets; WASM presence reported honestly', (t) => {
   const f = path.join(root, 'dist/ArmorLab.html'); assert.ok(fs.existsSync(f), 'run npm run build first'); const h = fs.readFileSync(f, 'utf8');
-  for (const k of ['class Sim', 'WebGL', 'TIGER2_UPPER_GLACIS', 'ARMORLAB_PRESETS=', 'makeConfig']) assert.ok(h.includes(k), k);
+  for (const k of [
+    'class Sim', 'WebGL', 'TIGER2_UPPER_GLACIS', 'TIGER2_PZGR4043', 'wc_core',
+    'US_76_M62_APCT', 'US_90_M82_APCT', 'SU_122_BR471_APHE', 'SU_122_BR471B_APHEBC',
+    'CN_100_TYPE73_APDS', 'CN_100_TYPE73_HEATFS', 'SE_57_SLPGR_M43', 'IT_90_53_CGP',
+    'ARMORLAB_PRESETS=', 'makeConfig', 'projectileSilhouette', 'projectilePreview', 'shapeOverlay', 'al_cfg_len'
+  ]) assert.ok(h.includes(k), k);
   assert.ok(!/<script[^>]+src=|<link[^>]+href=|@import|fetch\(|XMLHttpRequest/.test(h), 'no external references or network calls');
   if (/ARMORLAB_WASM_B64=null/.test(h)) t.diagnostic('WASM NOT embedded in this build (no Rust toolchain in authoring environment)'); else assert.ok(/ARMORLAB_WASM_B64="[A-Za-z0-9+/=]{1000,}"/.test(h));
 });

@@ -1,0 +1,43 @@
+# International ammunition catalogue additions
+
+The eight requested international designations are in `presets/presets.json` and the source-linked `international_ammunition_evidence.csv`. The CSV is listed in the research manifest, parsed with the other research datasets, included in the source register checks, and embedded in the offline HTML. Exact source values and units are kept separately from SI values used by the existing application. Each entry is selectable in comparison mode and has a separate `solver_approximation` block used by the actual scenario builder and passed unchanged through the JavaScript or Rust/WASM solver interface.
+
+## Experimental approximation inputs
+
+Every added entry runs only as an inert effective solid body using the existing generic projectile material preset. The approximation block labels each value's basis; a provisional value is not a newly discovered historical measurement. Source-backed mass or muzzle speed is used only where the earlier evidence record contains it. Missing values remain unknown in the historical record and receive an explicitly provisional test default only in the separate simulation block. The UI labels the initial speed as an idealised simulation input; it does not model flight or derive impact speed.
+
+| ID | Simulation mass | Initial speed | Assumed envelope |
+|---|---:|---:|---|
+| `US_76_M62_APCT` | 7.0034661928 kg, source-reported projectile mass | 792.48 m/s, source muzzle velocity used as idealised initial speed | 190 mm body, 53.2 mm nose |
+| `US_90_M82_APCT` | 8 kg, provisional | 600 m/s, provisional | 225 mm body, 63 mm nose |
+| `SU_122_BR471_APHE` | 25 kg, source-reported with uncertain convention | 780 m/s, source gun-family table value | 305 mm body, 85.4 mm nose |
+| `SU_122_BR471B_APHEBC` | 25 kg, source-reported with uncertain convention | 780 m/s, source gun-family table value | 317.2 mm body, 91.5 mm nose |
+| `CN_100_TYPE73_APDS` | 8 kg, provisional | 600 m/s, provisional | 250 mm full-calibre body, 70 mm nose |
+| `CN_100_TYPE73_HEATFS` | 10 kg, provisional | 600 m/s, provisional | 250 mm body, 70 mm nose |
+| `SE_57_SLPGR_M43` | 3 kg, provisional | 600 m/s, provisional | 142.5 mm body, 39.9 mm nose |
+| `IT_90_53_CGP` | 10 kg, provisional; ambiguous 12.1 kg source value excluded | 758 m/s, source muzzle velocity used as idealised initial speed | 225 mm body, 63 mm nose |
+
+All assumed lengths use explicitly provisional calibre ratios, not measured drawings. Except for BR-471B, the demonstration envelope uses a 2.5-calibre body and 0.7-calibre rounded nose; BR-471B uses 2.6 and 0.75 only to keep its test profile independently identifiable. This difference is not sourced and does not represent verified ballistic-cap geometry or a predicted physical distinction. The source velocity for BR-471/471B remains associated only with the cited gun-family table. All profiles reference `PROJECTILE_PROVISIONAL`; its steel response is generic/tuning data and not specific to these munitions. The user may edit the initial-speed input, while the other assumed profile values are visible but fixed in the preset.
+
+The Phase 2 silhouette uses each profile's configured calibre, length, nose type, and taper in both the pre-fire SVG preview and the solver particle sampler. All eight international shape profiles are explicitly provisional; differing profile settings are educational demonstration envelopes, not historically measured contours. The renderer does not fabricate the unknown AP caps, ballistic caps, sabot/carrier assembly, fins, or cavity outlines. For Pzgr.40/43 the optional internal schematic is labelled as an estimated solver core/carrier section; it reflects the approximation, not confirmed placement or construction. After firing, the profile overlay is removed and the deformed particle field remains the simulation view.
+
+These are solver demonstration inputs, not complete physical models of the named munitions. In particular, both APDS and HEAT-FS run as full-calibre inert-body demonstrations: the app does **not** simulate an APDS penetrator/sabot assembly or discard, nor HEAT detonation, liner collapse, jet, standoff or fins. APHE/APHEBC and the Italian perforante's reported explosive details are metadata only; there is no fuze, detonation, or behind-armour effect. Solver output is determined by the generic numerical state, not an ammunition-ID outcome rule.
+
+## Catalogue entries and evidence status
+
+| ID | Country / designation | Source-backed facts recorded | Unknowns and simulation status |
+|---|---|---|---|
+| `US_76_M62_APCT` | United States — 76 mm M62 APC-T | Firing Test No. 3 transcription: 15.44 lb projectile, separate 24.80 lb complete round, 2600 ft/s M/V; AP cap, windshield, base fuze and tracer. Mass and velocity are converted to 7.0034661928 kg and 792.48 m/s for display only. | Exact gun model, dimensions, material, cavity/filler and fuze model are not established by this report. Active only as a visibly provisional inert-body experiment; no cap, fuze, or explosive physics. |
+| `US_90_M82_APCT` | United States — 90 mm M82 APC-T | The supplied handbook scan is retained as a source lead. | The exact entry was not extracted; gun/variant, projectile mass, velocity, dimensions, fuze and filler remain unknown. Active only as a visibly provisional inert-body experiment. |
+| `SU_122_BR471_APHE` | Soviet Union — 122 mm BR-471 APHE | The secondary transcription lists 25 kg, 780 m/s for the associated 122 mm Model 1931/37 gun-family table, 156 g HE weight and MD-8 fuze. | This velocity is not transferred to the D-25T tank gun. Geometry, material and exact filler composition are unknown. Active only as a visibly provisional inert-body experiment. |
+| `SU_122_BR471B_APHEBC` | Soviet Union — 122 mm BR-471B APHEBC | Kept distinct from BR-471; source lists 25 kg, the same gun-family table velocity, and MD-8 / DBR fuze designations. | A dash in the explosive-charge field is not interpreted as zero. Geometry, material and charge are unknown. Active only as a visibly provisional inert-body experiment. |
+| `CN_100_TYPE73_APDS` | China — 100 mm Type 73 APDS | Designation preserved from the supplied starting references. | The archived page returns HTTP 401; exact designation, gun compatibility, mass, velocity, penetrator and sabot are unverified. Active only as a visibly provisional full-calibre inert-body demonstration, not APCR or APDS physics. |
+| `CN_100_TYPE73_HEATFS` | China — 100 mm Type 73 / Type 1973 HEAT-FS | Both reported designation forms are retained without treating them as proven synonyms. | Exact designation, gun pairing and round data are unresolved. Active only as a visibly provisional inert-body demonstration; no detonation, liner-collapse or shaped-charge jet model. |
+| `SE_57_SLPGR_M43` | Sweden — 57 mm slpgr m/43 APHEBC | The Swedish article identifies a WWII APHE round for the 57 mm pvkan m/43 family, but not this exact shell designation. | Exact designation/gun compatibility, dimensions, mass, velocity, filler, fuze and materials remain unverified. Active only as a visibly provisional inert-body experiment. |
+| `IT_90_53_CGP` | Italy — 90 mm Cartoccio Granata Perforante Mod. 1909 | Secondary table for the 90/53 Mod. 1939 reports 758 m/s muzzle velocity, 520 g TNT quantity and Mod. 1909 fuze. | Its 12.1 kg table mass is preserved as ambiguous and is not assigned as projectile mass. An additional unlabeled perforante row remains separate and unresolved. Active only as a visibly provisional inert-body experiment. |
+
+The prior catalogue-only gate was removed. All eight entries now pass their individual profile through `web/scenario.js` into the actual JS/WASM configuration and can be built, fired, reset, and advanced. There is no APCR fallback or hard-coded penetration outcome. Because generic inert-body physics cannot reproduce the listed special mechanisms, do not interpret the demonstrations as historical ballistics.
+
+The existing three German models remain unchanged: Pzgr.39 and Pzgr.39/43 use an effective solid body, while Pzgr.40/43 uses the existing estimated core/carrier model. The eight additions use separate provisional profiles as described above. No claim is made that the new international rounds' historical construction is physically simulated.
+
+The Italian source reports an exact Mod. 1909 row, followed in the extracted table by an additional perforante line whose association/variant is unclear. That unresolved line has its own catalogue subrecord ID (`IT_90_53_CGP_UNSPECIFIED_LINE`) but no asserted projectile identity or numeric properties; the Mod. 1909 values are not copied to it or merged with it.

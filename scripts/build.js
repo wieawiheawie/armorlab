@@ -50,10 +50,11 @@ const researchManifest = JSON.parse(rd('research/ArmorLab_Research_Pack/manifest
 const researchCsv = Object.fromEntries(researchManifest.csv_files.map((name) => [name, rd(`research/ArmorLab_Research_Pack/data/${name}`)]));
 let html = rd('web/index.template.html');
 const put = (k, v) => { html = html.replace(`/*__${k}__*/`, () => v); };
-const files = { CSS: 'web/style.css', ENGINE_JS: 'web/engine_js.js', ENGINE_WASM: 'web/engine_wasm.js', RESEARCH: 'web/research.js', SCENARIO: 'web/scenario.js', RUNNER: 'web/runner.js', PICK: 'web/pick.js', HOST: 'web/host.js', RENDER: 'web/render.js', APP: 'web/app.js' };
+const files = { CSS: 'web/style.css', ENGINE_JS: 'web/engine_js.js', ENGINE_WASM: 'web/engine_wasm.js', RESEARCH: 'web/research.js', BOUNDARY: 'web/boundary.js', SCENARIO: 'web/scenario.js', RUNNER: 'web/runner.js', PICK: 'web/pick.js', HOST: 'web/host.js', RENDER: 'web/render.js', APP: 'web/app.js' };
 for (const [k, f] of Object.entries(files)) put(k, esc(rd(f)));
-put('WORKER_SRC', esc(['web/engine_js.js', 'web/engine_wasm.js', 'web/scenario.js', 'web/runner.js', 'web/worker_main.js'].map(rd).join('\n;\n')));
-put('PRESETS', presets); put('RESEARCH_CSV', esc(JSON.stringify(researchCsv))); put('WASM', wasmB64); put('BUILD', `${engine}; ${new Date().toISOString().slice(0, 10)}`);
+const workerBoundary = `self.ARMORLAB_BOUNDARY_CSV=${JSON.stringify(researchCsv['boundary_model_parameters.csv'])};`;
+put('WORKER_SRC', esc([workerBoundary, ...['web/engine_js.js', 'web/engine_wasm.js', 'web/boundary.js', 'web/scenario.js', 'web/runner.js', 'web/worker_main.js'].map(rd)].join('\n;\n')));
+put('PRESETS', presets); put('RESEARCH_CSV', esc(JSON.stringify(researchCsv))); put('BOUNDARY_CSV', esc(JSON.stringify(researchCsv['boundary_model_parameters.csv']))); put('WASM', wasmB64); put('BUILD', `${engine}; ${new Date().toISOString().slice(0, 10)}`);
 if (requireWasm && !/ARMORLAB_WASM_B64="AGFzbQ/.test(html)) fail('release HTML does not contain a WASM payload');
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });
 if (!buildSucceeded && !jsOnly && hasValidWasmHtml(releaseHtml)) {

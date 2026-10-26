@@ -10,9 +10,10 @@ void main(){
   vec2 p=(aPos-uCenter)*uScale; gl_Position=vec4(p.x/uRes.x*2.0, p.y/uRes.y*2.0, 0.0, 1.0);
   float sz=max(uSize*uScale, 1.7); gl_PointSize=sz; vSolid = sz<3.2 ? 1.0 : 0.0;
   vec3 plate=vec3(0.50,0.56,0.64), proj=vec3(0.90,0.64,0.24), clamp_=vec3(0.28,0.31,0.36);
-  vec3 base = aMat>1.5 ? clamp_ : (aMat>0.5 ? proj : plate);
+  vec3 core=vec3(0.62,0.43,0.78);
+  vec3 base = aMat>3.5 ? clamp_ : (aMat>2.5 ? core : (aMat>0.5 ? proj : plate));
   if(uMode<0.5){ vCol = base*(1.0-0.75*aDmg); }
-  else if(uMode<1.5){ vCol = aMat>1.5 ? vec3(0.45,0.38,0.62) : (aMat>0.5 ? vec3(0.90,0.64,0.24) : vec3(0.30,0.62,0.75)); }
+  else if(uMode<1.5){ vCol = aMat>3.5 ? vec3(0.45,0.38,0.62) : (aMat>2.5 ? core : (aMat>0.5 ? vec3(0.90,0.64,0.24) : vec3(0.30,0.62,0.75))); }
   else if(uMode<2.5){ vCol = ramp(aDmg); }
   else { vCol = ramp(aSpd/uVmax); }
 }`;

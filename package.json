@@ -6,7 +6,7 @@
     "build": "node scripts/build.js",
     "build:release": "node scripts/build.js --require-wasm",
     "build:js": "node scripts/build.js --js-only",
-    "test": "node --test tests/physics.test.js tests/optimization.test.js tests/research.test.js",
+    "test": "node --test tests/physics.test.js tests/optimization.test.js tests/research.test.js tests/armor_validation.test.js",
     "test:rust": "cargo test --release",
     "smoke": "node scripts/smoke_worker.js",
     "report": "node scripts/report.js",

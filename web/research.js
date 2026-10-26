@@ -3,7 +3,9 @@
 const requiredFiles = [
   'ammunition_mechanism_models.csv',
   'ammunition_variants.csv',
+  'international_ammunition_evidence.csv',
   'armor_surfaces_and_samples.csv',
+  'boundary_model_parameters.csv',
   'historical_penetration_reference_curves.csv',
   'image_and_drawing_references.csv',
   'implementation_milestones.csv',
@@ -48,12 +50,22 @@ function numeric(value) {
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
 }
+function sourcedNumber(value, unit, conversions, label, id) {
+  if (!value || value === 'unknown') return null;
+  const raw = numeric(value);
+  if (raw == null || raw <= 0) throw new Error(`Invalid ${label} value for ${id}: ${value}`);
+  if (!Object.prototype.hasOwnProperty.call(conversions, unit)) throw new Error(`Invalid ${label} unit for ${id}: ${unit}`);
+  return raw * conversions[unit];
+}
 function load(csvFiles) {
   const tables = {};
   for (const name of requiredFiles) {
     if (typeof csvFiles[name] !== 'string') throw new Error(`Missing research dataset: ${name}`);
     tables[name] = parseCsv(csvFiles[name]);
   }
+  const Boundary = root.ALBoundary || (typeof require === 'function' ? require('./boundary.js') : null);
+  if (!Boundary) throw new Error('Boundary parameter parser is not loaded');
+  const boundaryModels = Boundary.parseRows(tables['boundary_model_parameters.csv']);
   const uniqueBy = (table, key, filename) => {
     const result = new Map();
     for (const record of table) {
@@ -64,6 +76,10 @@ function load(csvFiles) {
     return result;
   };
   const sources = uniqueBy(tables['source_register.csv'], 'source_id', 'source_register.csv');
+  for (const model of boundaryModels) {
+    const refs = model.source_reference.split(';').filter((id) => /^S\d+$/.test(id));
+    for (const sourceId of refs) if (!sources.has(sourceId)) throw new Error(`Boundary model ${model.model_id} references missing source ${sourceId}`);
+  }
   const sourceIds = (record) => Array.isArray(record.source_ids) ? record.source_ids : (record.source_ids || '').split(';').filter(Boolean);
   const ammunition = uniqueBy(tables['ammunition_variants.csv'].map((reported) => ({
     ...reported,
@@ -76,6 +92,20 @@ function load(csvFiles) {
       explosive_filler_kg: numeric(reported.explosive_filler_kg_reported)
     }
   })), 'ammo_id', 'ammunition_variants.csv');
+  const internationalAmmunition = uniqueBy(tables['international_ammunition_evidence.csv'].map((reported) => {
+    const id = reported.ammo_id || '(missing ID)';
+    return {
+      ...reported,
+      source_ids: sourceIds(reported),
+      projectile_mass_numeric_kg: sourcedNumber(reported.projectile_mass_value, reported.projectile_mass_unit, { kg: 1, g: 0.001, lb: 0.45359237 }, 'projectile mass', id),
+      muzzle_velocity_numeric_m_s: sourcedNumber(reported.muzzle_velocity_value, reported.muzzle_velocity_unit, { 'm/s': 1, 'ft/s': 0.3048 }, 'muzzle velocity', id),
+      calibre_numeric_mm: sourcedNumber(reported.calibre_value, reported.calibre_unit, { mm: 1 }, 'calibre', id)
+    };
+  }), 'ammo_id', 'international_ammunition_evidence.csv');
+  for (const record of internationalAmmunition.values()) {
+    if (!record.ammo_id || !record.designation || !record.country) throw new Error('international_ammunition_evidence.csv has a row without identity fields');
+    for (const sourceId of record.source_ids) if (!sources.has(sourceId)) throw new Error(`International ammunition ${record.ammo_id} references missing source ${sourceId}`);
+  }
   const armorTargets = uniqueBy(tables['armor_surfaces_and_samples.csv'].map((reported) => ({
     ...reported,
     reported,
@@ -124,16 +154,19 @@ function load(csvFiles) {
     tables,
     sources,
     ammunition,
+    internationalAmmunition,
     guns,
     armorTargets,
     referenceTests,
     validationCases: referenceTests,
     referenceCurves,
-    sourceIds
+    sourceIds,
+    boundaryModels
   };
 }
 function integratePresets(presets, research) {
   const result = JSON.parse(JSON.stringify(presets));
+  result.boundary_models = research.boundaryModels;
   for (const [id, target] of Object.entries(result.targets)) {
     if (!target.research_id) throw new Error(`Target ${id} has no research_id`);
     const record = research.armorTargets.get(target.research_id);
@@ -154,10 +187,50 @@ function integratePresets(presets, research) {
     if (!ammo.research_id) throw new Error(`Ammunition ${id} has no research_id`);
     const record = research.ammunition.get(ammo.research_id);
     if (!record) throw new Error(`Ammunition ${id} references missing record ${ammo.research_id}`);
+    const internationalRecord = research.internationalAmmunition.get(id);
+    if (internationalRecord) {
+      ammo.international_evidence = internationalRecord;
+      ammo.country = internationalRecord.country;
+      ammo.historical_designation = internationalRecord.designation;
+    }
     const mass = record.numeric.projectile_mass_kg, caliber = record.numeric.caliber_mm, velocity = record.numeric.muzzle_velocity_m_s;
-    if (mass == null || caliber == null || velocity == null) throw new Error(`Ammunition ${id} is missing a sourced mass, calibre, or muzzle velocity`);
+    if (internationalRecord) {
+      const evidence = internationalRecord;
+      if (mass != null && evidence.projectile_mass_numeric_kg != null && Math.abs(mass - evidence.projectile_mass_numeric_kg) > 1e-9 * Math.max(1, mass)) {
+        throw new Error(`Ammunition ${id} projectile mass disagrees with its international evidence record`);
+      }
+      if (caliber != null && evidence.calibre_numeric_mm != null && caliber !== evidence.calibre_numeric_mm) {
+        throw new Error(`Ammunition ${id} calibre disagrees with its international evidence record`);
+      }
+      if (velocity != null && evidence.muzzle_velocity_numeric_m_s != null && Math.abs(velocity - evidence.muzzle_velocity_numeric_m_s) > 1e-9 * Math.max(1, velocity)) {
+        throw new Error(`Ammunition ${id} muzzle velocity disagrees with its international evidence record`);
+      }
+    }
+    if (ammo.simulation_status === 'kinetic_approximation' && (mass == null || caliber == null || velocity == null)) {
+      throw new Error(`Ammunition ${id} is missing a sourced mass, calibre, or muzzle velocity`);
+    }
+    if (ammo.simulation_status === 'experimental_approximation') {
+      const model = ammo.solver_approximation;
+      if (!model || model.status !== 'experimental_approximation' || model.model !== 'effective_solid_body' ||
+          ![model.mass_kg, model.initial_velocity_mps, model.length_mm, model.nose_length_mm].every((value) => Number.isFinite(value) && value > 0) ||
+          !model.material_id || !model.mass_basis || !model.velocity_basis || !model.geometry_basis || !model.material_basis ||
+          !Array.isArray(model.metadata_only_features) || model.metadata_only_features.length === 0) {
+        throw new Error(`Ammunition ${id} has an incomplete experimental approximation profile`);
+      }
+      if (caliber != null && model.nose_length_mm >= model.length_mm) {
+        throw new Error(`Ammunition ${id} experimental geometry has nose length >= body length`);
+      }
+    }
+    if (ammo.simulation_status === 'kinetic_approximation' || ammo.simulation_status === 'experimental_approximation') {
+      const geometry = ammo.solver_approximation || ammo.simulation_geometry;
+      if (!geometry || !['rounded', 'pointed', 'ogive'].includes(geometry.nose_profile) ||
+          !Number.isFinite(geometry.body_taper_fraction) || geometry.body_taper_fraction < 0 || geometry.body_taper_fraction > 0.5 ||
+          !(geometry.shape_basis || geometry.basis)) {
+        throw new Error(`Ammunition ${id} has an incomplete or invalid solver geometry profile`);
+      }
+    }
     ammo.projectile_mass_kg = mass;
-    ammo.calibre_mm = caliber;
+    ammo.calibre_mm = caliber == null ? ammo.calibre_mm : caliber;
     ammo.nominal_muzzle_velocity_mps = velocity;
     ammo.gun_id = record.gun_id;
     ammo.family = record.family;

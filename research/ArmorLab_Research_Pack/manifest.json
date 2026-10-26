@@ -7,11 +7,13 @@
     "implementation_milestones.csv",
     "armor_surfaces_and_samples.csv",
     "ammunition_variants.csv",
+    "international_ammunition_evidence.csv",
     "validation_cases.csv",
     "image_and_drawing_references.csv",
     "ammunition_mechanism_models.csv",
     "historical_penetration_reference_curves.csv",
     "material_and_solver_parameter_checklist.csv",
+    "boundary_model_parameters.csv",
     "source_register.csv"
   ],
   "source_count": 34
